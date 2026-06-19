@@ -1,5 +1,11 @@
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { ChatGoogle } from "@langchain/google";
+import { createHash } from "crypto";
+import {
+  clearChromaChunks,
+  indexChunksToChroma,
+  queryChromaForChunks,
+} from "./chroma-client";
 
 type DesignPhase = "analysis" | "dataModel" | "architecture";
 
@@ -28,6 +34,7 @@ const MODEL_CANDIDATES = Array.from(
     "gemini-2.5-pro",
   ])
 );
+const MODEL_INVOKE_TIMEOUT_MS = 45_000;
 const MAX_CHUNK_SIZE = 2800;
 const CHUNK_OVERLAP = 320;
 
@@ -151,52 +158,100 @@ function escapeRegExp(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-function scoreChunk(text: string, keywords: string[]) {
-  const lower = text.toLowerCase();
-
-  return keywords.reduce((score, keyword) => {
-    const pattern = new RegExp(`\\b${escapeRegExp(keyword.toLowerCase())}\\b`, "g");
-    const matches = lower.match(pattern);
-    return score + (matches?.length ?? 0);
-  }, 0);
+/**
+ * Generate a deterministic document ID from document text.
+ */
+function generateDocumentId(text: string): string {
+  return createHash("sha256").update(text).digest("hex").substring(0, 16);
 }
 
-function selectRelevantChunks(text: string, phase: DesignPhase) {
-  const chunks = splitDocument(text);
+/**
+ * Create a query string for phase-specific semantic search.
+ */
+function createPhaseQuery(phase: DesignPhase): string {
   const keywords = PHASE_KEYWORDS[phase];
-
-  const scored = chunks.map((chunk) => ({
-    ...chunk,
-    score:
-      scoreChunk(chunk.text, keywords) +
-      (chunk.index === 0 ? 4 : 0) +
-      Math.min(2, Math.floor(chunk.text.length / 1200)),
-  }));
-
-  return scored
-    .sort((left, right) => {
-      if (right.score !== left.score) {
-        return right.score - left.score;
-      }
-
-      return left.index - right.index;
-    })
-    .slice(0, Math.min(8, scored.length));
+  return keywords.slice(0, 10).join(" ");
 }
 
-function buildContext(text: string, phase: DesignPhase) {
-  const selectedChunks = selectRelevantChunks(text, phase);
-  const context = selectedChunks
+function formatChunksAsContext(chunks: Chunk[]) {
+  return chunks
     .map(
       (chunk, position) =>
         `[[Chunk ${position + 1} | source ${chunk.index + 1} | score ${chunk.score}]]\n${chunk.text}`
     )
     .join("\n\n---\n\n");
+}
 
-  return {
-    context,
-    selectedChunks,
-  };
+/**
+ * Select relevant chunks using Chroma metadata filters and similarity scores.
+ */
+async function selectRelevantChunks(
+  chunks: Chunk[],
+  phase: DesignPhase,
+  documentId: string
+): Promise<Chunk[]> {
+  try {
+    const queryText = createPhaseQuery(phase);
+    const selectedChunks = await queryChromaForChunks(
+      documentId,
+      queryText,
+      phase,
+      Math.min(8, chunks.length)
+    );
+
+    if (selectedChunks.length > 0) {
+      return selectedChunks;
+    }
+  } catch (error) {
+    console.warn(
+      "Chroma retrieval failed, using first chunks:",
+      error instanceof Error ? error.message : String(error)
+    );
+  }
+
+  // Fallback: return first chunks if retrieval fails
+  return chunks.slice(0, 8);
+}
+
+async function buildContext(
+  text: string,
+  phase: DesignPhase,
+  documentId: string
+) {
+  const chunks = splitDocument(text);
+
+  try {
+    await indexChunksToChroma(documentId, chunks, phase);
+    const ids = chunks.map((chunk) => `${documentId}_chunk_${chunk.index}`);
+    console.log(`Indexed ${ids.length} chunks to ${phase} collection`);
+
+    // Query for relevant chunks
+    const selectedChunks = await selectRelevantChunks(
+      chunks,
+      phase,
+      documentId
+    );
+
+    const context = formatChunksAsContext(selectedChunks);
+
+    return {
+      context,
+      selectedChunks,
+    };
+  } catch (error) {
+    console.warn(
+      "Error in buildContext:",
+      error instanceof Error ? error.message : String(error)
+    );
+    // Fallback: return first 8 chunks
+    const fallbackChunks = chunks.slice(0, 8);
+    const context = formatChunksAsContext(fallbackChunks);
+
+    return {
+      context,
+      selectedChunks: fallbackChunks,
+    };
+  }
 }
 
 function createModel(model: string, options?: { thinkingBudget?: number; temperature?: number }) {
@@ -210,7 +265,30 @@ function createModel(model: string, options?: { thinkingBudget?: number; tempera
 
 function isRetryableModelError(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
-  return /quota exceeded|rate limit|please retry|service unavailable/i.test(message);
+  return /quota exceeded|rate limit|please retry|service unavailable|503|fetch failed|etimedout|timeout|unavailable/i.test(message);
+}
+
+async function invokeModelWithTimeout(
+  model: ChatGoogle,
+  messages: Array<SystemMessage | HumanMessage>,
+  timeoutMs: number
+) {
+  let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+
+  try {
+    return await Promise.race([
+      model.invoke(messages),
+      new Promise<never>((_, reject) => {
+        timeoutHandle = setTimeout(() => {
+          reject(new Error(`Model invocation timed out after ${timeoutMs}ms`));
+        }, timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timeoutHandle) {
+      clearTimeout(timeoutHandle);
+    }
+  }
 }
 
 async function invokeWithFallback(
@@ -222,7 +300,7 @@ async function invokeWithFallback(
   for (const modelName of MODEL_CANDIDATES) {
     try {
       const model = createModel(modelName, options);
-      return await model.invoke(messages);
+      return await invokeModelWithTimeout(model, messages, MODEL_INVOKE_TIMEOUT_MS);
     } catch (error) {
       lastError = error;
 
@@ -301,11 +379,14 @@ function detectDomainHints(text: string) {
     .map(([label]) => label);
 }
 
-function generateFallbackDesign(documentText: string): DesignResult {
+async function generateFallbackDesign(
+  documentText: string,
+  documentId: string
+): Promise<DesignResult> {
   const normalized = normalizeText(documentText);
-  const architectureContext = buildContext(normalized, "architecture");
   const domainHints = detectDomainHints(normalized);
   const summary = compactSummary(normalized);
+  const fallbackChunks = splitDocument(normalized).slice(0, 8);
 
   return {
     projectSummary:
@@ -323,7 +404,7 @@ function generateFallbackDesign(documentText: string): DesignResult {
       "Which external integrations are required for the first release?",
       "Should the product support multi-tenancy, role-based access, or SSO?",
     ],
-    retrievalHighlights: architectureContext.selectedChunks.map((chunk) => {
+    retrievalHighlights: fallbackChunks.map((chunk) => {
       const snippet = chunk.text.replace(/\s+/g, " ").slice(0, 220);
       return `Chunk ${chunk.index + 1} | score ${chunk.score}: ${snippet}${chunk.text.length > 220 ? "..." : ""}`;
     }),
@@ -395,7 +476,7 @@ function generateFallbackDesign(documentText: string): DesignResult {
       "  A->>B: Enqueue notifications / side effects",
       "```",
     ].join("\n"),
-    selectedChunkCount: architectureContext.selectedChunks.length,
+    selectedChunkCount: fallbackChunks.length,
     documentLength: normalized.length,
     generatedAt: new Date().toISOString(),
   };
@@ -404,9 +485,10 @@ function generateFallbackDesign(documentText: string): DesignResult {
 async function generateSection(
   phase: DesignPhase,
   documentText: string,
-  previousSections: string
-) {
-  const { context } = buildContext(documentText, phase);
+  previousSections: string,
+  documentId: string
+): Promise<{ markdown: string; context: string; selectedChunks: Chunk[] }> {
+  const { context, selectedChunks } = await buildContext(documentText, phase, documentId);
   const systemPrompt =
     phase === "analysis"
       ? "You are a senior product analyst. Convert the requirements into a concise architecture brief. Return Markdown with the headings: Product intent, Actors, Functional requirements, Non-functional requirements, Assumptions, and Open questions. Do not invent missing requirements."
@@ -429,41 +511,54 @@ async function generateSection(
     }
   );
 
-  return contentToText(response.content);
+  return {
+    markdown: contentToText(response.content),
+    context,
+    selectedChunks,
+  };
 }
 
 export async function generateSystemDesign(documentText: string): Promise<DesignResult> {
   const normalized = normalizeText(documentText);
+  const documentId = generateDocumentId(normalized);
 
   try {
-    const analysisMarkdown = await generateSection("analysis", normalized, "");
-    const dataModelMarkdown = await generateSection("dataModel", normalized, analysisMarkdown);
-    const systemDesignMarkdown = await generateSection(
+    const analysisResult = await generateSection("analysis", normalized, "", documentId);
+    const dataModelResult = await generateSection("dataModel", normalized, analysisResult.markdown, documentId);
+    const {
+      markdown: systemDesignMarkdown,
+      selectedChunks: architectureSelectedChunks,
+    } = await generateSection(
       "architecture",
       normalized,
-      `${analysisMarkdown}\n\n${dataModelMarkdown}`
+      `${analysisResult.markdown}\n\n${dataModelResult.markdown}`,
+      documentId
     );
 
-    const assumptions = extractBullets(analysisMarkdown, "Assumptions");
-    const openQuestions = extractBullets(analysisMarkdown, "Open questions");
-    const projectSummary = extractBullets(analysisMarkdown, "Product intent").join(" ");
-    const architectureContext = buildContext(normalized, "architecture");
+    const assumptions = extractBullets(analysisResult.markdown, "Assumptions");
+    const openQuestions = extractBullets(analysisResult.markdown, "Open questions");
+    const projectSummary = extractBullets(analysisResult.markdown, "Product intent").join(" ");
 
     return {
       projectSummary: projectSummary || "The document was analyzed into a multi-stage system design draft.",
       assumptions: assumptions.length > 0 ? assumptions : ["No explicit assumptions were returned by the model."],
       openQuestions: openQuestions.length > 0 ? openQuestions : ["No open questions were returned by the model."],
-      retrievalHighlights: architectureContext.selectedChunks.map((chunk) => {
+      retrievalHighlights: architectureSelectedChunks.map((chunk) => {
         const snippet = chunk.text.replace(/\s+/g, " ").slice(0, 220);
         return `Chunk ${chunk.index + 1} | score ${chunk.score}: ${snippet}${chunk.text.length > 220 ? "..." : ""}`;
       }),
-      dataModelMarkdown,
+      dataModelMarkdown: dataModelResult.markdown,
       systemDesignMarkdown,
-      selectedChunkCount: architectureContext.selectedChunks.length,
+      selectedChunkCount: architectureSelectedChunks.length,
       documentLength: normalized.length,
       generatedAt: new Date().toISOString(),
     };
-  } catch {
-    return generateFallbackDesign(normalized);
+  } catch (error) {
+    console.error("Error generating system design:", error);
+    return generateFallbackDesign(normalized, documentId);
+  } finally {
+    for (const phase of ["analysis", "dataModel", "architecture"] as const) {
+      await clearChromaChunks(documentId, phase).catch(() => undefined);
+    }
   }
 }

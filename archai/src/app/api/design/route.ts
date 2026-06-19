@@ -6,18 +6,29 @@ import { generateSystemDesign } from "@/lib/design-generator";
 
 export const runtime = "nodejs";
 
-// Initialize the PDFParse worker path for server-side execution under Next.js/Turbopack
-try {
-  const require = createRequire(path.join(process.cwd(), "package.json"));
-  const pdfParsePath = require.resolve("pdf-parse");
-  const pdfParseRequire = createRequire(pdfParsePath);
-  const workerPath = pdfParseRequire.resolve("pdfjs-dist/legacy/build/pdf.worker.mjs");
-  PDFParse.setWorker(workerPath);
-} catch (error) {
-  console.error("Failed to initialize PDFParse worker path:", error);
+let pdfWorkerInitialized = false;
+
+async function ensurePdfWorker() {
+  if (pdfWorkerInitialized) {
+    return;
+  }
+
+  try {
+    const require = createRequire(path.join(process.cwd(), "package.json"));
+    const pdfParsePath = require.resolve("pdf-parse");
+    const pdfParseRequire = createRequire(pdfParsePath);
+    const workerPath = pdfParseRequire.resolve("pdfjs-dist/legacy/build/pdf.worker.mjs");
+    PDFParse.setWorker(workerPath);
+    pdfWorkerInitialized = true;
+  } catch (error) {
+    throw new Error(
+      `Failed to initialize PDFParse worker path: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
 }
 
 async function extractPdfText(file: File) {
+  await ensurePdfWorker();
   const parser = new PDFParse({ data: Buffer.from(await file.arrayBuffer()) });
 
   try {
