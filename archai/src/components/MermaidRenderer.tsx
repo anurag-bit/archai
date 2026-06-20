@@ -151,7 +151,25 @@ function preprocessMermaidChart(chart: string): string {
     return chart;
   }
 
-  const entityRegex = /(^|\r?\n)(\s*)([a-zA-Z_][a-zA-Z0-9_-]*)\s*\{([^}]*)\}/g;
+  // Pre-sanitize reserved keywords (like CLASS) in the frontend chart string
+  const reservedKeywords = ["class", "state", "title", "graph", "relation", "entity", "classdiagram", "erdiagram"];
+  reservedKeywords.forEach(keyword => {
+    // Replace unquoted keyword table names with quoted versions
+    // Example: CLASS { -> "CLASS" {
+    const entityDefRegex = new RegExp(`(^|\\r?\\n|\\s)(${keyword})\\s*\\{`, "gi");
+    processed = processed.replace(entityDefRegex, '$1"$2" {');
+
+    // For relationships: we match word boundary for the keyword
+    // relLeftRegex: CLASS ||--o{
+    const relLeftRegex = new RegExp(`(^|\\r?\\n|\\s)(${keyword})\\s+([|o{}-]+)`, "gi");
+    processed = processed.replace(relLeftRegex, '$1"$2" $3');
+    
+    // relRightRegex: ||--o{ CLASS
+    const relRightRegex = new RegExp(`([|o{}-]+)\\s+(${keyword})(\\s|:|$)`, "gi");
+    processed = processed.replace(relRightRegex, '$1 "$2"$3');
+  });
+
+  const entityRegex = /(^|\r?\n)(\s*)("[a-zA-Z_][a-zA-Z0-9_-]*"|[a-zA-Z_][a-zA-Z0-9_-]*)\s*\{([^}]*)\}/g;
 
   processed = processed.replace(entityRegex, (match, newline, indent, entityName, attributesContent) => {
     const lines = splitAttributes(attributesContent);
