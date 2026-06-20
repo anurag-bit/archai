@@ -124,12 +124,16 @@ async def save_module_design_node(state: ModuleGraphState) -> dict:
     if "data_model" in merged:
         merged["data_model"]["mermaid_er"] = sanitized_mermaid
 
+    lld = state.get("lld_design") or {}
+
     domain_entry = {
         "module": module,
         "design": {
             "er_diagram_mermaid": sanitized_mermaid,
             "sql_ddl":            sql_ddl,
             "api_endpoints":      api_endpoints,
+            "dfd_mermaid":        lld.get("dfd_mermaid", ""),
+            "component_mermaid":  lld.get("component_mermaid", ""),
             "raw_json":           merged,
         },
         "selected_chunks": state.get("module_chunks", []),

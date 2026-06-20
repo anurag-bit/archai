@@ -27,6 +27,7 @@ from services.design.nodes import (
     dba_agent_node,
     qa_agent_node,
     api_agent_node,
+    lld_agent_node,
     save_module_design_node,
 )
 from core.config import MAX_QA_RETRIES, MAX_CONCURRENT_MODULES
@@ -57,13 +58,15 @@ def _build_module_graph() -> StateGraph:
     graph.add_node("dba_agent",          dba_agent_node)
     graph.add_node("qa_agent",           qa_agent_node)
     graph.add_node("api_agent",          api_agent_node)
+    graph.add_node("lld_agent",          lld_agent_node)
     graph.add_node("save_module_design", save_module_design_node)
 
     # Fixed edges
     graph.set_entry_point("fetch_context")
     graph.add_edge("fetch_context",  "dba_agent")
     graph.add_edge("dba_agent",      "qa_agent")
-    graph.add_edge("api_agent",      "save_module_design")
+    graph.add_edge("api_agent",      "lld_agent")
+    graph.add_edge("lld_agent",      "save_module_design")
     graph.add_edge("save_module_design", END)
 
     # Conditional edges
@@ -159,6 +162,14 @@ def _build_data_model_markdown(domain_designs: List[Dict[str, Any]]) -> str:
                         f"| {api.get('srs_reference','')} |"
                     )
                 lines.append("")
+
+            dfd_mermaid = design.get("dfd_mermaid", "").strip()
+            if dfd_mermaid:
+                lines += ["### Data Flow Diagram (Level 1)\n", f"```mermaid\n{dfd_mermaid}\n```\n"]
+
+            component_mermaid = design.get("component_mermaid", "").strip()
+            if component_mermaid:
+                lines += ["### Low-Level Component Diagram\n", f"```mermaid\n{component_mermaid}\n```\n"]
 
             workflows = rich.get("workflows", [])
             if workflows:
@@ -272,6 +283,7 @@ async def generate_system_design(
                     "qa_feedback":     "",
                     "qa_retries":      0,
                     "api_design":      {},
+                    "lld_design":      {},
                     "module_design":   None,
                     # Architecture constraints
                     "tech_stack":          tech_stack,

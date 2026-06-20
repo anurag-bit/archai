@@ -7,6 +7,8 @@ type DomainDesign = {
     er_diagram_mermaid?: string;
     sql_ddl?: string;
     api_endpoints?: string[];
+    dfd_mermaid?: string;
+    component_mermaid?: string;
   };
   error?: string;
 };
@@ -21,9 +23,14 @@ export function ModuleSpec({ activeDesign }: ModuleSpecProps) {
 
   const handleCopySpec = async () => {
     try {
-      await navigator.clipboard.writeText(
-        `# ${activeDesign.module}\n\n## SQL DDL\n\`\`\`sql\n${sql}\n\`\`\`\n\n## API Endpoints\n${apis}`
-      );
+      let content = `# ${activeDesign.module}\n\n## SQL DDL\n\`\`\`sql\n${sql}\n\`\`\`\n\n## API Endpoints\n${apis}`;
+      if (activeDesign.design?.dfd_mermaid) {
+        content += `\n\n## Data Flow Diagram (Level 1)\n\`\`\`mermaid\n${activeDesign.design.dfd_mermaid}\n\`\`\``;
+      }
+      if (activeDesign.design?.component_mermaid) {
+        content += `\n\n## Low-Level Component Diagram\n\`\`\`mermaid\n${activeDesign.design.component_mermaid}\n\`\`\``;
+      }
+      await navigator.clipboard.writeText(content);
     } catch (err) {
       console.error(err);
     }
@@ -56,6 +63,26 @@ export function ModuleSpec({ activeDesign }: ModuleSpecProps) {
             <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Entity Relationship Diagram</h4>
             <div className="bg-slate-900/30 border border-white/5 rounded-2xl p-4 overflow-x-auto flex justify-center">
               <MermaidRenderer chart={activeDesign.design.er_diagram_mermaid} />
+            </div>
+          </div>
+        )}
+
+        {/* Data Flow Diagram Section */}
+        {activeDesign.design?.dfd_mermaid && (
+          <div className="space-y-2.5">
+            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Data Flow Diagram (Level 1)</h4>
+            <div className="bg-slate-900/30 border border-white/5 rounded-2xl p-4 overflow-x-auto flex justify-center">
+              <MermaidRenderer chart={activeDesign.design.dfd_mermaid} />
+            </div>
+          </div>
+        )}
+
+        {/* Low-Level Component Diagram Section */}
+        {activeDesign.design?.component_mermaid && (
+          <div className="space-y-2.5">
+            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Low-Level Component Diagram</h4>
+            <div className="bg-slate-900/30 border border-white/5 rounded-2xl p-4 overflow-x-auto flex justify-center">
+              <MermaidRenderer chart={activeDesign.design.component_mermaid} />
             </div>
           </div>
         )}

@@ -21,6 +21,8 @@ type DomainDesign = {
     er_diagram_mermaid?: string;
     sql_ddl?: string;
     api_endpoints?: string[];
+    dfd_mermaid?: string;
+    component_mermaid?: string;
   };
   error?: string;
 };

@@ -21,6 +21,7 @@ class GraphState(TypedDict):
     qa_retries:      int                   # retry counter for QA->DBA loop
 
     api_design:      Dict[str, Any]        # JSON output from API agent
+    lld_design:      Dict[str, Any]        # JSON output containing LLD/DFD diagrams
 
     # accumulator
     domain_designs:  List[Dict[str, Any]]  # finished per-module designs
@@ -48,6 +49,7 @@ class ModuleGraphState(TypedDict):
     qa_retries:      int                   # retry counter for QA->DBA loop
 
     api_design:      Dict[str, Any]        # JSON output from API agent
+    lld_design:      Dict[str, Any]        # JSON output containing LLD/DFD diagrams
 
     # output
     module_design:   Optional[Dict[str, Any]]  # final design for this module

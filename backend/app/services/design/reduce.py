@@ -21,48 +21,74 @@ The software system consists of the following {MODULE_COUNT} modules:
 - Security: {SECURITY_PROTOCOLS}
 
 ### YOUR TASK
-Design the comprehensive production architecture. You MUST output a detailed Markdown document with the following distinct sections. Do not skip any section.
+Design the comprehensive, production-grade architecture. You MUST output a detailed Markdown document with the following distinct sections. Do not skip any section.
 
 #### 1. High-Level Microservices Architecture Diagram
 Generate a Mermaid `graph TD` flowchart showing the complete request lifecycle AND inter-service communication.
 CRITICAL RULES FOR MERMAID:
-- DO NOT use a single generic "Microservices" block. 
+- DO NOT use generic labels. You MUST use the technologies specified in the Tech Stack ({TECH_STACK}) to label the nodes (e.g., `Client[Next.js Frontend]`, `Service[Golang Microservice]`).
+- **SECURITY PERIMETER:** You MUST include a Web Application Firewall (WAF) and an API Gateway node. 
+- **AUTH FLOW:** Show the API Gateway validating JWTs against an Auth Service before routing to internal modules.
 - Map out the specific modules generated in Phase 1 as separate nodes.
-- If a User/Auth module exists, show the API Gateway delegating authentication to it before routing to core modules (e.g., API_Gateway -->|Validate JWT| Auth_Module).
-- Show the API Gateway routing requests to the specific modules.
-- Use solid lines (`-->`) for synchronous calls (Client -> Gateway -> Module -> Database).
-- Use dashed lines (`-.->`) for asynchronous/event-driven communication.
-- Include nodes for: Client, API Gateway, Auth_Module, other individual Modules, PostgreSQL, Redis Cache, and the Message Queue.
+- Use solid lines (`-->`) for synchronous calls and dashed lines (`-.->`) for asynchronous/event-driven communication (Queue).
 
-#### 2. Infrastructure & Compute Layer
-- Specify the containerization strategy (e.g., Docker, Kubernetes, ECS).
-- Specify how the application is hosted (e.g., AWS App Runner, GKE, EKS).
+#### 2. Network Architecture & Topology Diagram (CRITICAL)
+Generate a Mermaid `graph TD` flowchart specifically mapping the Network Topology.
+CRITICAL RULES FOR MERMAID:
+- Use `subgraph` to clearly define network boundaries.
+- Create a `subgraph "Cloud Provider VPC"` containing all resources.
+- Inside the VPC, create `subgraph "Public Subnets"` and `subgraph "Private Subnets"`.
+- **Public Subnet:** Must contain the Load Balancer (ALB/NLB) and NAT Gateway.
+- **Private Subnet:** Must contain the Application Nodes (EKS/GKE worker nodes), the Database (PostgreSQL), and the Cache/Queue (Redis/SQS).
+- Show traffic flow: `Internet --> IGW --> ALB --> Private Subnet Nodes`.
+- Show egress flow: `Private Subnet Nodes --> NAT Gateway --> IGW --> Internet`.
+- Label nodes with specific tech (e.g., `ALB[AWS Application Load Balancer]`).
+
+#### 3. Network Configuration & Routing
+- **VPC & Subnets:** Specify the IP range strategy (e.g., 10.0.0.0/16 VPC, 10.0.1.0/24 Public, 10.0.2.0/24 Private).
+- **Security Groups (SGs):** List the specific SGs and their inbound/outbound rules (e.g., `ALB-SG` allows 443 Inbound from Internet; `App-SG` allows 8080 Inbound only from `ALB-SG`; `DB-SG` allows 5432 Inbound only from `App-SG`).
+- **Routing Tables:** Explain how traffic is routed (Public routes to IGW, Private routes to NAT).
+
+#### 4. Infrastructure & Compute Layer
+- Specify the containerization and hosting strategy (e.g., Docker, AWS EKS).
 - Discuss auto-scaling policies based on CPU/Memory/Request count.
 
-#### 3. Data Layer & Caching
+#### 5. Data Layer & Caching
 - Specify the primary database setup (e.g., PostgreSQL with Read Replicas).
-- **Caching Strategy:** Identify which specific modules/tables need caching and specify the caching technology (Redis/Memcached) and invalidation strategy.
-- **Search Engine:** If the system requires complex querying, propose Elasticsearch or OpenSearch.
+- **Caching Strategy:** Identify which specific modules/tables need caching and specify the technology and invalidation strategy.
+- **Search Engine:** Propose Elasticsearch/OpenSearch if complex querying is needed.
 
-#### 4. Asynchronous Processing & Queuing System
-Identify long-running or background tasks and map them to a Message Queue architecture:
+#### 6. Asynchronous Processing & Queuing System
 - **Queue Technology:** Recommend RabbitMQ, AWS SQS, or Apache Kafka.
-- **Event-Driven Workflows:** List at least 3 cross-module workflows that must be asynchronous (e.g., "When Order is placed -> Queue event -> Inventory updates -> Invoice generates").
+- **Event-Driven Workflows:** List at least 3 cross-module workflows that must be asynchronous.
 - **Background Workers:** Specify how workers consume these queues.
 
-#### 5. Observability (Logging, Monitoring, Tracing)
-- **Centralized Logging:** Propose an ELK stack or Datadog. Specify exactly what must be logged.
-- **Metrics & Monitoring:** Propose Prometheus and Grafana. Specify the alerting thresholds.
-- **Distributed Tracing:** Propose Jaeger or OpenTelemetry to trace requests across microservices.
+#### 7. Security & Compliance Architecture (CRITICAL)
+You MUST explicitly address how the system enforces the user's specific security protocols: {SECURITY_PROTOCOLS}.
+- **Network Security:** WAF rules (SQLi, XSS), DDoS protection (AWS Shield).
+- **Application Security:** Rate Limiting (Redis-backed at API Gateway), Backend Only Abstraction.
+- **Identity & Access Management (IAM):** Detail the RBAC implementation. How are JWT tokens issued, validated, and scoped?
+- **Data Security:** Encryption at rest (KMS) and in transit (TLS 1.3). Column-level encryption for PII.
 
-#### 6. Security Layer
-- **Network Security:** VPC setup, Private Subnets for DB/Queues, Public Subnets for Load Balancers.
-- **Application Security:** How API Gateway handles Rate Limiting and JWT validation.
-- **Data Security:** Encryption at rest (KMS) and in transit (TLS 1.3). How PII is encrypted at the column level.
+#### 8. Threat Model & Mitigations (STRIDE)
+Provide a Markdown table mapping the STRIDE threat model to specific architectural mitigations:
+| Threat Type | Example Scenario | Architectural Mitigation |
+|---|---|---|
+| Spoofing | ... | ... |
+| Tampering | ... | ... |
+| Repudiation | ... | ... |
+| Information Disclosure | ... | ... |
+| Denial of Service | ... | ... |
+| Elevation of Privilege | ... | ... |
 
-#### 7. CI/CD Pipeline
+#### 9. Observability (Logging, Monitoring, Tracing)
+- **Centralized Logging:** Propose ELK/Datadog. Specify that auth failures and rate-limit hits MUST be logged.
+- **Metrics & Monitoring:** Prometheus/Grafana alerting thresholds.
+- **Distributed Tracing:** Jaeger/OpenTelemetry for tracing requests across microservices.
+
+#### 10. CI/CD Pipeline
 - Propose a GitOps workflow (GitHub Actions / GitLab CI).
-- Specify the pipeline stages: Lint -> Test -> Build Docker Image -> Deploy to Staging -> Integration Tests -> Production Deploy.
+- Pipeline stages: Lint -> Test -> Build Docker Image -> Deploy to Staging -> Integration Tests -> Production Deploy.
 - Discuss database migration strategies (e.g., Alembic zero-downtime migrations).
 """
 
