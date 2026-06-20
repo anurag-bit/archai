@@ -1,78 +1,52 @@
-import { createRequire } from "module";
-import path from "path";
-import { PDFParse } from "pdf-parse";
+import { NextResponse } from "next/server";
 
-import { generateSystemDesign } from "@/lib/design-generator";
-
-export const runtime = "nodejs";
-
-let pdfWorkerInitialized = false;
-
-async function ensurePdfWorker() {
-  if (pdfWorkerInitialized) {
-    return;
-  }
-
-  try {
-    const require = createRequire(path.join(process.cwd(), "package.json"));
-    const pdfParsePath = require.resolve("pdf-parse");
-    const pdfParseRequire = createRequire(pdfParsePath);
-    const workerPath = pdfParseRequire.resolve("pdfjs-dist/legacy/build/pdf.worker.mjs");
-    PDFParse.setWorker(workerPath);
-    pdfWorkerInitialized = true;
-  } catch (error) {
-    throw new Error(
-      `Failed to initialize PDFParse worker path: ${error instanceof Error ? error.message : String(error)}`
-    );
-  }
-}
-
-async function extractPdfText(file: File) {
-  await ensurePdfWorker();
-  const parser = new PDFParse({ data: Buffer.from(await file.arrayBuffer()) });
-
-  try {
-    const result = await parser.getText();
-    return result.text.trim();
-  } finally {
-    await parser.destroy();
-  }
-}
-
-async function extractDocumentText(file: File) {
-  const fileName = file.name.toLowerCase();
-
-  if (file.type === "application/pdf" || fileName.endsWith(".pdf")) {
-    return extractPdfText(file);
-  }
-
-  return file.text();
-}
+export const maxDuration = 300; // Allow 5 minutes on Vercel/production if deployed
 
 export async function POST(request: Request) {
   try {
-    const formData = await request.formData();
-    const requirements = String(formData.get("requirements") ?? "").trim();
-    const document = formData.get("document");
+    const incomingFormData = await request.formData();
+    const requirements = (incomingFormData.get("requirements") as string) || "";
+    const documentFile = incomingFormData.get("document") as File | null;
+    const techStack = (incomingFormData.get("tech_stack") as string) || "";
+    const designPrinciples = (incomingFormData.get("design_principles") as string) || "";
+    const securityProtocols = (incomingFormData.get("security_protocols") as string) || "";
 
-    let documentText = requirements;
+    // Create a new standard FormData instance to send via fetch
+    const formData = new FormData();
+    formData.append("requirements", requirements);
+    if (documentFile && documentFile.size > 0) {
+      formData.append("document", documentFile);
+    }
+    formData.append("tech_stack", techStack);
+    formData.append("design_principles", designPrinciples);
+    formData.append("security_protocols", securityProtocols);
 
-    if (document instanceof File && document.size > 0) {
-      const uploadedText = (await extractDocumentText(document)).trim();
-      documentText = [requirements, uploadedText].filter(Boolean).join("\n\n");
+    // Forward the request to the backend
+    const response = await fetch("http://127.0.0.1:8080/api/design", {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      try {
+        const errorJson = JSON.parse(errorText);
+        return NextResponse.json(errorJson, { status: response.status });
+      } catch {
+        return new NextResponse(errorText, {
+          status: response.status,
+          headers: { "Content-Type": "text/plain" },
+        });
+      }
     }
 
-    if (!documentText) {
-      return Response.json(
-        { error: "Add a requirements document or paste requirement text before generating." },
-        { status: 400 }
-      );
-    }
-
-    const result = await generateSystemDesign(documentText);
-    return Response.json(result);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to generate system design.";
-    return Response.json({ error: message }, { status: 500 });
+    const data = await response.json();
+    return NextResponse.json(data);
+  } catch (error: any) {
+    console.error("Proxy error in /api/design:", error);
+    return NextResponse.json(
+      { error: error.message || "Internal Server Error" },
+      { status: 500 }
+    );
   }
 }
