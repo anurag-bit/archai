@@ -1,21 +1,73 @@
 @import "tailwindcss";
 
 @theme {
-  --color-brand-cyan: #22d3ee;
-  --color-brand-blue: #38bdf8;
-  --color-brand-indigo: #6366f1;
-  --color-brand-violet: #8b5cf6;
+  --color-brand-cyan: #7aa08a;
+  --color-brand-blue: #c8b299;
+  --color-brand-indigo: #b09b83;
+  --color-brand-violet: #98846c;
+
+  /* Redefine cyan palette for premium desaturated/eye-soothing earthy-sage */
+  --color-cyan-50: #f5f8f6;
+  --color-cyan-100: #e2ebe6;
+  --color-cyan-200: #c6d9cf;
+  --color-cyan-300: #9dbfb0;
+  --color-cyan-400: #7aa08a; /* Earthy Sage Green */
+  --color-cyan-500: #5d826d;
+  --color-cyan-600: #496856;
+  --color-cyan-700: #3c5446;
+  --color-cyan-800: #2d3e33;
+  --color-cyan-900: #243229;
+  --color-cyan-950: #121915;
+
+  /* Redefine violet and indigo palette to warm champagne/sand */
+  --color-violet-50: #faf9f6;
+  --color-violet-100: #f3eedd;
+  --color-violet-200: #e7ddc4;
+  --color-violet-300: #dac9a8;
+  --color-violet-400: #c8b299; /* Warm Champagne Sand */
+  --color-violet-500: #b09b83;
+  --color-violet-600: #98846c;
+  --color-violet-700: #7a6a57;
+  --color-violet-850: #594d3f;
+  --color-violet-900: #3d342b;
+  --color-violet-950: #1f1a15;
+
+  --color-indigo-50: #faf9f6;
+  --color-indigo-100: #f3eedd;
+  --color-indigo-200: #e7ddc4;
+  --color-indigo-300: #dac9a8;
+  --color-indigo-400: #c8b299;
+  --color-indigo-500: #b09b83;
+  --color-indigo-600: #98846c;
+  --color-indigo-700: #7a6a57;
+  --color-indigo-800: #594d3f;
+  --color-indigo-900: #3d342b;
+  --color-indigo-950: #1f1a15;
+
+  /* Redefine slate palette to warm coal-bronze tones */
+  --color-slate-950: #090908; /* Deep warm coal background */
+  --color-slate-900: #10100f;
+  --color-slate-800: #181816;
+  --color-slate-700: #252523;
+  --color-slate-650: #2c2c2a;
+  --color-slate-600: #3d3d3a;
+  --color-slate-500: #6e6e6a;
+  --color-slate-400: #9e9e9a;
+  --color-slate-350: #bebeb8;
+  --color-slate-300: #d6d6d0;
+  --color-slate-200: #e6e6df;
+  --color-slate-100: #f5f5f0;
 }
 
 :root {
-  --background: #030712;
-  --foreground: #f3f4f6;
-  --muted: #9ca3af;
-  --card: rgba(17, 24, 39, 0.45);
-  --card-border: rgba(255, 255, 255, 0.08);
-  --accent: #22d3ee;
-  --accent-strong: #06b6d4;
-  --accent-glow: rgba(34, 211, 238, 0.15);
+  --background: #090908;
+  --foreground: #e6e6df;
+  --muted: #9e9e9a;
+  --card: rgba(24, 24, 22, 0.6);
+  --card-border: rgba(255, 255, 255, 0.03);
+  --accent: #7aa08a;
+  --accent-strong: #5d826d;
+  --accent-glow: rgba(122, 160, 138, 0.12);
 }
 
 * {
@@ -45,11 +97,11 @@
 
 html {
   min-height: 100%;
-  background-color: #030712;
+  background-color: #090908;
   background-image: 
-    radial-gradient(circle at 10% 20%, rgba(99, 102, 241, 0.15) 0%, transparent 40%),
-    radial-gradient(circle at 90% 10%, rgba(34, 211, 238, 0.12) 0%, transparent 35%),
-    radial-gradient(circle at 50% 80%, rgba(139, 92, 246, 0.08) 0%, transparent 45%);
+    radial-gradient(circle at 10% 20%, rgba(200, 178, 153, 0.04) 0%, transparent 45%),
+    radial-gradient(circle at 90% 10%, rgba(122, 160, 138, 0.05) 0%, transparent 40%),
+    radial-gradient(circle at 50% 80%, rgba(176, 155, 131, 0.03) 0%, transparent 50%);
   background-attachment: fixed;
 }
 
@@ -62,7 +114,7 @@ body {
 }
 
 ::selection {
-  background: rgba(34, 211, 238, 0.2);
+  background: rgba(122, 160, 138, 0.2);
   color: #ffffff;
 }
 
@@ -74,7 +126,7 @@ body {
   }
   50% {
     opacity: 1;
-    transform: scale(1.05);
+    transform: scale(1.03);
   }
 }
 
@@ -125,34 +177,34 @@ body {
 
 /* Glassmorphic Utilities */
 .glass-panel {
-  background: rgba(10, 15, 30, 0.45);
-  backdrop-filter: blur(16px) saturate(120%);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  background: rgba(16, 16, 15, 0.55);
+  backdrop-filter: blur(20px) saturate(120%);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.55);
 }
 
 .glass-panel-glow {
-  background: rgba(10, 15, 30, 0.55);
-  backdrop-filter: blur(20px) saturate(140%);
-  border: 1px solid rgba(34, 211, 238, 0.15);
+  background: rgba(16, 16, 15, 0.65);
+  backdrop-filter: blur(24px) saturate(130%);
+  border: 1px solid rgba(122, 160, 138, 0.15);
   box-shadow: 
-    0 8px 32px 0 rgba(0, 0, 0, 0.4),
-    0 0 40px rgba(34, 211, 238, 0.03);
+    0 10px 40px -10px rgba(0, 0, 0, 0.65),
+    0 0 50px rgba(122, 160, 138, 0.02);
 }
 
 .text-gradient-cyan-indigo {
-  background: linear-gradient(135deg, #22d3ee 0%, #6366f1 100%);
+  background: linear-gradient(135deg, #7aa08a 0%, #c8b299 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
 .text-gradient-glow {
-  text-shadow: 0 0 20px rgba(34, 211, 238, 0.2);
+  text-shadow: 0 0 20px rgba(122, 160, 138, 0.1);
 }
 
 /* Custom Markdown Rendering (.prose) */
 .prose {
-  color: #9ca3af; /* gray-400 */
+  color: #9e9e9a; /* slate-400 */
   font-size: 0.925rem;
   line-height: 1.625;
 }
@@ -212,7 +264,7 @@ body {
   border-collapse: collapse;
   margin: 1.25rem 0;
   font-size: 0.85rem;
-  background: rgba(10, 15, 30, 0.3);
+  background: rgba(16, 16, 15, 0.3);
   border-radius: 8px;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.05);
@@ -230,7 +282,7 @@ body {
 .prose td {
   padding: 0.6rem 0.85rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.03);
-  color: #d1d5db;
+  color: #d6d6d0;
 }
 
 .prose tr:last-child td {
@@ -249,33 +301,34 @@ body {
 
 .prose blockquote {
   border-left: 3px solid var(--accent);
-  background: rgba(34, 211, 238, 0.03);
+  background: rgba(122, 160, 138, 0.03);
   padding: 0.6rem 1rem;
   margin: 1rem 0;
   border-radius: 0 6px 6px 0;
   font-style: italic;
-  color: #9ca3af;
+  color: #9e9e9a;
 }
 
 /* Syntax Highlighting overrides */
 .hljs-keyword, .hljs-selector-tag {
-  color: #f43f5e;
+  color: #c07b5a; /* Clay Rust */
   font-weight: 600;
 }
 .hljs-string {
-  color: #34d399;
+  color: #8ca893; /* Soft Sage */
 }
 .hljs-comment {
-  color: #6b7280;
+  color: #6e6e6a; /* Slate Gray */
   font-style: italic;
 }
 .hljs-number, .hljs-literal {
-  color: #fbbf24;
+  color: #cca26a; /* Soft Gold */
 }
 .hljs-type, .hljs-class, .hljs-title, .hljs-section {
-  color: #38bdf8;
+  color: #c8b299; /* Sand / Titanium */
   font-weight: 600;
 }
 .hljs-attr {
-  color: #fda4af;
+  color: #b09b83;
 }
+

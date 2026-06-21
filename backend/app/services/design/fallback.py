@@ -39,4 +39,7 @@ def generate_fallback_design(document_text: str, document_id: str) -> Dict[str, 
         "generatedAt":           time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "documentText":          normalized,
         "retrievedChunks":       fallback_chunks,
+        "terraformCode":         "",
+        "openapiSpec":           "",
+        "documentId":            document_id,
     }

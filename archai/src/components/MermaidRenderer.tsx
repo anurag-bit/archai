@@ -10,17 +10,17 @@ if (typeof window !== "undefined") {
     theme: "dark",
     securityLevel: "loose",
     themeVariables: {
-      primaryColor: "#0891b2", // cyan-600
-      primaryTextColor: "#f8fafc", // slate-50
-      lineColor: "#64748b", // slate-500
-      primaryBorderColor: "#22d3ee", // cyan-400
-      nodeBorder: "#334155", // slate-700
-      mainBkg: "#0f172a", // slate-900
-      actorBkg: "#0f172a",
-      actorBorder: "#334155",
-      signalColor: "#22d3ee",
-      signalLineColor: "#64748b",
-      cardinalityStroke: "#64748b",
+      primaryColor: "#5d826d", // earthy sage green
+      primaryTextColor: "#f5f5f0", // warm off-white
+      lineColor: "#6e6e6a", // warm slate gray
+      primaryBorderColor: "#7aa08a", // sage accent
+      nodeBorder: "#252523", // charcoal border
+      mainBkg: "#0f0f0e", // warm coal background
+      actorBkg: "#0f0f0e",
+      actorBorder: "#252523",
+      signalColor: "#7aa08a",
+      signalLineColor: "#6e6e6a",
+      cardinalityStroke: "#6e6e6a",
     },
   });
 }

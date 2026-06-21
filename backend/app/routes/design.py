@@ -1,8 +1,9 @@
 import uuid
 import traceback
-from typing import Optional
+from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, Form, File, UploadFile, HTTPException
-from services.design import generate_system_design
+from pydantic import BaseModel
+from services.design import generate_system_design, regenerate_module_design, apply_schema_patch
 from utils.pdf_parser import extract_pdf_text
 
 router = APIRouter()
@@ -61,4 +62,39 @@ async def design_endpoint(
         raise HTTPException(
             status_code=500,
             detail={"error": "An internal error occurred", "requestId": request_id}
+        )
+
+@router.post("/api/design/{document_id}/regenerate/{module_name}")
+async def regenerate_module_endpoint(document_id: str, module_name: str):
+    try:
+        result = await regenerate_module_design(document_id, module_name)
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        request_id = str(uuid.uuid4())
+        print(f"[Request {request_id}] Module regeneration error: {traceback.format_exc()}")
+        raise HTTPException(
+            status_code=500,
+            detail={"error": "An internal error occurred during module regeneration", "requestId": request_id}
+        )
+
+
+class PatchSchemaRequest(BaseModel):
+    tables: List[Dict[str, Any]]
+
+
+@router.patch("/api/design/{document_id}/patch/{module_name}")
+async def patch_schema_endpoint(document_id: str, module_name: str, req: PatchSchemaRequest):
+    try:
+        result = await apply_schema_patch(document_id, module_name, req.tables)
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        request_id = str(uuid.uuid4())
+        print(f"[Request {request_id}] Schema patch error: {traceback.format_exc()}")
+        raise HTTPException(
+            status_code=500,
+            detail={"error": "An internal error occurred during schema patching", "requestId": request_id}
         )

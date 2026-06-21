@@ -34,6 +34,9 @@ type DesignResponse = {
   retrievalHighlights: string[];
   dataModelMarkdown: string;
   systemDesignMarkdown: string;
+  terraformCode?: string;
+  openapiSpec?: string;
+  documentId?: string;
   selectedChunkCount: number;
   documentLength: number;
   generatedAt: string;
@@ -76,11 +79,15 @@ export default function Home() {
   const [activeStep, setActiveStep] = useState(0);
   
   // Dashboard Workspace State
-  const [activeTab, setActiveTab] = useState<"architecture" | "database" | "requirements">("architecture");
+  const [activeTab, setActiveTab] = useState<"architecture" | "database" | "requirements" | "terraform" | "openapi">("architecture");
   const [previewMode, setPreviewMode] = useState(true);
   const [copiedFull, setCopiedFull] = useState(false);
   const [copiedReqs, setCopiedReqs] = useState(false);
+  const [copiedTerraform, setCopiedTerraform] = useState(false);
+  const [copiedOpenApi, setCopiedOpenApi] = useState(false);
   const [selectedModuleIndex, setSelectedModuleIndex] = useState<number>(0);
+  const [isRegeneratingModule, setIsRegeneratingModule] = useState(false);
+  const [isPatchingSchema, setIsPatchingSchema] = useState(false);
 
   // Advanced constraints states
   const [techStack, setTechStack] = useState("");
@@ -198,9 +205,67 @@ export default function Home() {
     setAnswers({});
   };
 
+  const handleRegenerateModule = async (moduleName: string) => {
+    if (!result || !result.documentId) return;
+    setIsRegeneratingModule(true);
+    try {
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL !== undefined
+        ? process.env.NEXT_PUBLIC_BACKEND_URL
+        : "http://127.0.0.1:8080";
+      const fetchUrl = `${backendUrl}/api/design/${result.documentId}/regenerate/${encodeURIComponent(moduleName)}`;
+      
+      const response = await fetch(fetchUrl, {
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to regenerate module design.");
+      }
+
+      const payload = (await response.json()) as DesignResponse;
+      setResult(payload);
+    } catch (err: any) {
+      setError(err.message || "Failed to regenerate module design.");
+    } finally {
+      setIsRegeneratingModule(false);
+    }
+  };
+
+  const handlePatchSchema = async (moduleName: string, newTables: any[]) => {
+    if (!result || !result.documentId) return;
+    setIsPatchingSchema(true);
+    try {
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL !== undefined
+        ? process.env.NEXT_PUBLIC_BACKEND_URL
+        : "http://127.0.0.1:8080";
+      const fetchUrl = `${backendUrl}/api/design/${result.documentId}/patch/${encodeURIComponent(moduleName)}`;
+      
+      const response = await fetch(fetchUrl, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ tables: newTables }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to save schema patch.");
+      }
+
+      const payload = (await response.json()) as DesignResponse;
+      setResult(payload);
+    } catch (err: any) {
+      setError(err.message || "Failed to save schema patch.");
+    } finally {
+      setIsPatchingSchema(false);
+    }
+  };
+
   const copyFullMarkdown = async () => {
     if (!result) return;
-    const fullContent = `# System Architecture Report\nGenerated on ${new Date(result.generatedAt).toLocaleString()}\n\n## Project Summary\n${result.projectSummary}\n\n## Assumptions\n${result.assumptions.map(a => `- ${a}`).join('\n')}\n\n## Open Questions\n${result.openQuestions.map(q => `- ${q}`).join('\n')}\n\n${result.dataModelMarkdown}\n\n${result.systemDesignMarkdown}`;
+    const tfBlock = result.terraformCode ? `\n\n# Terraform IaC Configuration\n\n\`\`\`terraform\n${result.terraformCode}\n\`\`\`` : "";
+    const apiBlock = result.openapiSpec ? `\n\n# OpenAPI 3.0 Specification\n\n\`\`\`yaml\n${result.openapiSpec}\n\`\`\`` : "";
+    const fullContent = `# System Architecture Report\nGenerated on ${new Date(result.generatedAt).toLocaleString()}\n\n## Project Summary\n${result.projectSummary}\n\n## Assumptions\n${result.assumptions.map(a => `- ${a}`).join('\n')}\n\n## Open Questions\n${result.openQuestions.map(q => `- ${q}`).join('\n')}\n\n${result.dataModelMarkdown}\n\n${result.systemDesignMarkdown}${tfBlock}${apiBlock}`;
     try {
       await navigator.clipboard.writeText(fullContent);
       setCopiedFull(true);
@@ -212,7 +277,9 @@ export default function Home() {
 
   const downloadReport = () => {
     if (!result) return;
-    const fullContent = `# System Architecture Report\nGenerated on ${new Date(result.generatedAt).toLocaleString()}\n\n## Project Summary\n${result.projectSummary}\n\n## Assumptions\n${result.assumptions.map(a => `- ${a}`).join('\n')}\n\n## Open Questions\n${result.openQuestions.map(q => `- ${q}`).join('\n')}\n\n${result.dataModelMarkdown}\n\n${result.systemDesignMarkdown}`;
+    const tfBlock = result.terraformCode ? `\n\n# Terraform IaC Configuration\n\n\`\`\`terraform\n${result.terraformCode}\n\`\`\`` : "";
+    const apiBlock = result.openapiSpec ? `\n\n# OpenAPI 3.0 Specification\n\n\`\`\`yaml\n${result.openapiSpec}\n\`\`\`` : "";
+    const fullContent = `# System Architecture Report\nGenerated on ${new Date(result.generatedAt).toLocaleString()}\n\n## Project Summary\n${result.projectSummary}\n\n## Assumptions\n${result.assumptions.map(a => `- ${a}`).join('\n')}\n\n## Open Questions\n${result.openQuestions.map(q => `- ${q}`).join('\n')}\n\n${result.dataModelMarkdown}\n\n${result.systemDesignMarkdown}${tfBlock}${apiBlock}`;
     const blob = new Blob([fullContent], { type: "text/markdown;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -312,6 +379,78 @@ export default function Home() {
                       {result.documentText || requirements}
                     </pre>
                   </div>
+                ) : activeTab === "openapi" ? (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between border-b border-white/10 pb-4">
+                      <div>
+                        <h2 className="text-base font-semibold text-white">OpenAPI Specification (openapi.yaml)</h2>
+                        <p className="text-xs text-slate-500 mt-1">Cohesive REST API specification generated from all module designs</p>
+                      </div>
+                      <button
+                        onClick={async () => {
+                          if (result.openapiSpec) {
+                            try {
+                              await navigator.clipboard.writeText(result.openapiSpec);
+                              setCopiedOpenApi(true);
+                              setTimeout(() => setCopiedOpenApi(false), 2000);
+                            } catch (err) {
+                              console.error(err);
+                            }
+                          }
+                        }}
+                        className="text-xs bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white px-3 py-1.5 rounded-lg border border-white/5 transition cursor-pointer flex items-center gap-1.5 font-semibold"
+                      >
+                        {copiedOpenApi ? (
+                          <>
+                            <svg className="w-3.5 h-3.5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                            <span className="text-emerald-400">Copied!</span>
+                          </>
+                        ) : (
+                          <>
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" /></svg>
+                            <span>Copy openapi.yaml</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                    <MarkdownRenderer content={`\`\`\`yaml\n${result.openapiSpec || "# No OpenAPI specification generated."}\n\`\`\``} />
+                  </div>
+                ) : activeTab === "terraform" ? (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between border-b border-white/10 pb-4">
+                      <div>
+                        <h2 className="text-base font-semibold text-white">Terraform Infrastructure as Code (main.tf)</h2>
+                        <p className="text-xs text-slate-500 mt-1">AWS Provider modules based on architecture specification</p>
+                      </div>
+                      <button
+                        onClick={async () => {
+                          if (result.terraformCode) {
+                            try {
+                              await navigator.clipboard.writeText(result.terraformCode);
+                              setCopiedTerraform(true);
+                              setTimeout(() => setCopiedTerraform(false), 2000);
+                            } catch (err) {
+                              console.error(err);
+                            }
+                          }
+                        }}
+                        className="text-xs bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white px-3 py-1.5 rounded-lg border border-white/5 transition cursor-pointer flex items-center gap-1.5 font-semibold"
+                      >
+                        {copiedTerraform ? (
+                          <>
+                            <svg className="w-3.5 h-3.5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                            <span className="text-emerald-400">Copied!</span>
+                          </>
+                        ) : (
+                          <>
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" /></svg>
+                            <span>Copy main.tf</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                    <MarkdownRenderer content={`\`\`\`terraform\n${result.terraformCode || "# No terraform code generated."}\n\`\`\``} />
+                  </div>
                 ) : previewMode ? (
                   activeTab === "database" && result.domainDesigns && result.domainDesigns.length > 0 ? (
                     <div className="flex flex-col lg:flex-row gap-6 min-h-[500px]">
@@ -320,7 +459,14 @@ export default function Home() {
                         selectedModuleIndex={selectedModuleIndex}
                         onSelectModule={setSelectedModuleIndex}
                       />
-                      <ModuleSpec activeDesign={result.domainDesigns[selectedModuleIndex]} />
+                      <ModuleSpec
+                        activeDesign={result.domainDesigns[selectedModuleIndex]}
+                        documentId={result.documentId}
+                        isRegenerating={isRegeneratingModule}
+                        onRegenerateModule={handleRegenerateModule}
+                        onPatchSchema={handlePatchSchema}
+                        isPatching={isPatchingSchema}
+                      />
                     </div>
                   ) : (
                     <MarkdownRenderer

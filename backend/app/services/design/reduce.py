@@ -1,4 +1,5 @@
 from typing import List, Dict, Any
+import re
 from langchain_core.messages import HumanMessage, SystemMessage
 from services.design.helpers import get_chat_model
 
@@ -92,6 +93,65 @@ Provide a Markdown table mapping the STRIDE threat model to specific architectur
 - Discuss database migration strategies (e.g., Alembic zero-downtime migrations).
 """
 
+async def generate_terraform_code(architecture_markdown: str) -> str:
+    """Translate system architecture design into valid, runnable AWS Terraform main.tf code."""
+    model = get_chat_model(temperature=0.1)
+    prompt = (
+        "You are an expert Cloud Infrastructure Engineer and Terraform specialist.\n"
+        "Convert this architecture into a valid Terraform main.tf file using AWS provider modules.\n"
+        "Output ONLY valid Terraform HCL code. Do NOT wrap it in any explanations.\n\n"
+        f"### ARCHITECTURE SPECIFICATION:\n{architecture_markdown}"
+    )
+    response = await model.ainvoke([
+        SystemMessage(content="You are a DevOps engineer writing Terraform code. Only return valid Terraform HCL code. Do not include markdown wraps or explanations."),
+        HumanMessage(content=prompt)
+    ])
+    content = response.content.strip()
+    if content.startswith("```"):
+        content = re.sub(r"^```[a-zA-Z]*\n", "", content)
+        content = re.sub(r"\n```$", "", content)
+    return content.strip()
+
+async def generate_openapi_spec(domain_designs: List[Dict[str, Any]]) -> str:
+    """Generate a single valid OpenAPI 3.0.0 YAML specification combining all modules' API endpoints."""
+    api_summaries = []
+    for d in domain_designs:
+        module = d.get("module", "?")
+        design = d.get("design", {})
+        rich = design.get("raw_json", design)
+        apis = rich.get("apis", [])
+        for api in apis:
+            api_summaries.append(
+                f"Module: {module} | Method: {api.get('method')} | Path: {api.get('path')} | Description: {api.get('description')}"
+            )
+    
+    if not api_summaries:
+        for d in domain_designs:
+            module = d.get("module", "?")
+            design = d.get("design", {})
+            eps = design.get("api_endpoints", [])
+            for ep in eps:
+                api_summaries.append(f"Module: {module} | Endpoint: {ep}")
+
+    model = get_chat_model(temperature=0.1)
+    prompt = (
+        "You are an expert API Architect.\n"
+        "Generate a valid OpenAPI 3.0.0 spec in YAML format combining the following API endpoints from all modules.\n"
+        "Ensure the paths, methods, descriptions, and basic parameters (e.g. {id}) are correctly structured.\n"
+        "Output ONLY valid YAML. Do NOT wrap in explanations or markdown backticks.\n\n"
+        f"### API ENDPOINTS:\n" + "\n".join(api_summaries)
+    )
+    
+    response = await model.ainvoke([
+        SystemMessage(content="You are an API design tool. Only return valid OpenAPI 3.0 YAML spec. Do not include markdown wraps or explanations."),
+        HumanMessage(content=prompt)
+    ])
+    content = response.content.strip()
+    if content.startswith("```"):
+        content = re.sub(r"^```[a-zA-Z]*\n", "", content)
+        content = re.sub(r"\n```$", "", content)
+    return content.strip()
+
 async def generate_global_architecture(
     domain_designs: List[Dict[str, Any]],
     tech_stack: str = "",
@@ -125,7 +185,13 @@ async def generate_global_architecture(
         )),
     ])
     
+    arch_markdown = response.content.strip()
+    terraform_code = await generate_terraform_code(arch_markdown)
+    openapi_spec = await generate_openapi_spec(domain_designs)
+    
     return {
-        "architecture_markdown": response.content.strip(), 
+        "architecture_markdown": arch_markdown, 
+        "terraform_code": terraform_code,
+        "openapi_spec": openapi_spec,
         "module_count": len(domain_designs)
     }

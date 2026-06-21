@@ -17,6 +17,8 @@ from services.design.helpers import (
     generate_document_id,
     compact_summary,
     detect_domain_hints,
+    get_chat_model,
+    format_chunks_as_context,
 )
 from services.design.fallback import generate_fallback_design
 from services.design.reduce import generate_global_architecture
@@ -340,6 +342,8 @@ async def generate_system_design(
             "retrievalHighlights":  highlights,
             "dataModelMarkdown":    _build_data_model_markdown(domain_designs),
             "systemDesignMarkdown": arch_res["architecture_markdown"],
+            "terraformCode":        arch_res["terraform_code"],
+            "openapiSpec":          arch_res.get("openapi_spec", ""),
             "selectedChunkCount":   len(retrieved_chunks),
             "documentLength":       len(normalized),
             "generatedAt":          time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
@@ -347,6 +351,12 @@ async def generate_system_design(
             "retrievedChunks":      retrieved_chunks,
             "modules":              modules,
             "domainDesigns":        domain_designs,
+            "documentId":           document_id,
+            # Constraints cached for single-module regeneration
+            "techStack":            tech_stack,
+            "designPrinciples":     design_principles,
+            "securityProtocols":    security_protocols,
+            "openQuestionsAnswers": open_questions_answers,
         }
 
         # ── Write to cache ──────────────────────────────────────────────────
@@ -370,3 +380,269 @@ async def generate_system_design(
             clear_chroma_chunks(document_id, "domain_design", request_id)
         except Exception:
             pass
+
+async def regenerate_module_design(document_id: str, module_name: str) -> Dict[str, Any]:
+    """
+    Re-runs the LangGraph design workflow just for one module, updates the cache,
+    and re-generates the global architecture and OpenAPI/Terraform configurations.
+    """
+    cache_dir  = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "cache")
+    cache_path = os.path.join(cache_dir, f"{document_id}.json")
+    if not os.path.exists(cache_path):
+        raise ValueError("Design not found")
+
+    with open(cache_path, "r", encoding="utf-8") as f:
+        cached_result = json.load(f)
+
+    domain_designs = cached_result.get("domainDesigns", [])
+    design_to_replace = next((d for d in domain_designs if d.get("module") == module_name), None)
+    if not design_to_replace:
+        raise ValueError(f"Module '{module_name}' not found in cached design")
+
+    # Retrieve constraints and inputs from cached JSON
+    normalized_text = cached_result.get("documentText", "")
+    tech_stack = cached_result.get("techStack", "")
+    design_principles = cached_result.get("designPrinciples", "")
+    security_protocols = cached_result.get("securityProtocols", "")
+    open_questions_answers = cached_result.get("openQuestionsAnswers", "")
+    request_id = str(uuid.uuid4())
+
+    # Temporarily index document chunks to Chroma for semantic queries by the node
+    prelim_modules = re.findall(
+        r'\d+\.\s*Module\s*Name\s*-\s*([^\n]+)', normalized_text, re.IGNORECASE
+    )
+    chunks = split_document(normalized_text, prelim_modules or None)
+    index_chunks_to_chroma(document_id, chunks, "domain_design", request_id)
+
+    try:
+        # Run module graph JUST for this module
+        initial_state = {
+            "normalized_text": normalized_text,
+            "document_id":     document_id,
+            "request_id":      request_id,
+            "current_module":  module_name,
+            "module_context":  "",
+            "module_chunks":   [],
+            "dba_draft":       {},
+            "qa_feedback":     "",
+            "qa_retries":      0,
+            "api_design":      {},
+            "lld_design":      {},
+            "module_design":   None,
+            "tech_stack":          tech_stack,
+            "design_principles":   design_principles,
+            "security_protocols":  security_protocols,
+            "open_questions_answers": open_questions_answers,
+        }
+        final_state = await _module_workflow_app.ainvoke(initial_state)
+        new_design = final_state.get("module_design")
+        if not new_design:
+            raise ValueError(f"Failed to generate design for module '{module_name}'")
+
+        # Replace the old module design
+        for i, d in enumerate(domain_designs):
+            if d.get("module") == module_name:
+                domain_designs[i] = new_design
+                break
+
+        # Re-generate global architecture (since a module design has changed)
+        arch_res = await generate_global_architecture(
+            domain_designs,
+            tech_stack=tech_stack,
+            design_principles=design_principles,
+            security_protocols=security_protocols
+        )
+
+        # Update cache values
+        cached_result["domainDesigns"] = domain_designs
+        cached_result["dataModelMarkdown"] = _build_data_model_markdown(domain_designs)
+        cached_result["systemDesignMarkdown"] = arch_res["architecture_markdown"]
+        cached_result["terraformCode"] = arch_res["terraform_code"]
+        cached_result["openapiSpec"] = arch_res.get("openapi_spec", "")
+        cached_result["generatedAt"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
+        # Write to cache
+        with open(cache_path, "w", encoding="utf-8") as f:
+            json.dump(cached_result, f, ensure_ascii=False, indent=2)
+
+        return cached_result
+
+    finally:
+        try:
+            clear_chroma_chunks(document_id, "domain_design", request_id)
+        except Exception:
+            pass
+
+
+async def _update_mermaid_er(old_mermaid: str, tables: List[Dict[str, Any]]) -> str:
+    """
+    Given the updated tables JSON and the old Mermaid ER diagram,
+    queries the LLM to generate an updated Mermaid ER diagram.
+    """
+    from langchain_core.messages import SystemMessage, HumanMessage
+    
+    system_message = (
+        "You are a Database Diagram Specialist. Your job is to generate a valid Mermaid erDiagram syntax "
+        "string based on a JSON list of tables (which contain column names, types, and constraints) and the "
+        "existing relations or ER diagram.\n"
+        "Follow these rules strictly:\n"
+        "1. Start the diagram with: erDiagram\n"
+        "2. Do NOT use commas between attribute lines.\n"
+        "3. Do NOT use commas at the end of attribute lines.\n"
+        "4. Format each entity exactly like this:\n"
+        "   ENTITY_NAME {\n"
+        "       type name PK/FK\n"
+        "       type name\n"
+        "   }\n"
+        "5. Keep the relationships in the ER diagram: format them like: ENTITY_A ||--o{ ENTITY_B : relationship_name\n"
+        "6. Do NOT invent new relationships that aren't justified, but ensure key relationships are captured.\n"
+        "7. Output ONLY the raw Mermaid diagram string (no markdown block, no comments, no prose)."
+    )
+    user_prompt = (
+        f"EXISTING MERMAID DIAGRAM:\n{old_mermaid}\n\n"
+        f"UPDATED TABLES JSON:\n{json.dumps(tables, indent=2)}\n\n"
+        "Generate the updated erDiagram syntax:"
+    )
+    try:
+        model = get_chat_model(temperature=0.0)
+        response = await model.ainvoke([
+            SystemMessage(content=system_message),
+            HumanMessage(content=user_prompt)
+        ])
+        content = response.content.strip()
+        if content.startswith("```mermaid"):
+            content = content[10:]
+        elif content.startswith("```"):
+            content = content[3:]
+        if content.endswith("```"):
+            content = content[:-3]
+        return content.strip()
+    except Exception as e:
+        print(f"Failed to generate ER diagram: {e}")
+        return old_mermaid
+
+
+async def apply_schema_patch(
+    document_id: str,
+    module_name: str,
+    new_tables: List[Dict[str, Any]]
+) -> Dict[str, Any]:
+    """
+    Applies manual patches to a module's database tables, regenerates the ER diagram,
+    re-runs the API and LLD agents, and updates the global architecture.
+    """
+    cache_dir  = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "cache")
+    cache_path = os.path.join(cache_dir, f"{document_id}.json")
+    if not os.path.exists(cache_path):
+        raise ValueError("Design not found")
+
+    with open(cache_path, "r", encoding="utf-8") as f:
+        cached_result = json.load(f)
+
+    domain_designs = cached_result.get("domainDesigns", [])
+    design_to_replace = next((d for d in domain_designs if d.get("module") == module_name), None)
+    if not design_to_replace:
+        raise ValueError(f"Module '{module_name}' not found in cached design")
+
+    # Extract existing details
+    design = design_to_replace.get("design", {})
+    raw_json = design.get("raw_json", {})
+    selected_chunks = design_to_replace.get("selected_chunks", [])
+    
+    # Update tables
+    if "data_model" not in raw_json:
+        raw_json["data_model"] = {}
+    raw_json["data_model"]["tables"] = new_tables
+
+    # Update Mermaid ER diagram
+    old_mermaid = raw_json["data_model"].get("mermaid_er", "")
+    new_mermaid = await _update_mermaid_er(old_mermaid, new_tables)
+    raw_json["data_model"]["mermaid_er"] = new_mermaid
+
+    module_context = format_chunks_as_context(selected_chunks)
+
+    # Build ModuleGraphState for running api_agent & lld_agent
+    state = {
+        "normalized_text": cached_result.get("documentText", ""),
+        "document_id":     document_id,
+        "request_id":      str(uuid.uuid4()),
+        "current_module":  module_name,
+        "module_context":  module_context,
+        "module_chunks":   selected_chunks,
+        "dba_draft":       raw_json,
+        "qa_feedback":     "PASS",
+        "qa_retries":      0,
+        "api_design":      {},
+        "lld_design":      {},
+        "tech_stack":          cached_result.get("techStack", ""),
+        "design_principles":   cached_result.get("designPrinciples", ""),
+        "security_protocols":  cached_result.get("securityProtocols", ""),
+        "open_questions_answers": cached_result.get("openQuestionsAnswers", ""),
+    }
+
+    # Run API Agent node
+    api_res = await api_agent_node(state)
+    state["api_design"] = api_res["api_design"]
+
+    # Run LLD Agent node
+    lld_res = await lld_agent_node(state)
+    state["lld_design"] = lld_res["lld_design"]
+
+    # Run Save Module Design Logic to compile final module design entry
+    from services.design.nodes.save_module_design import generate_ddl_from_tables, sanitize_mermaid_er
+    
+    merged = {**raw_json}
+    merged["apis"] = state["api_design"].get("apis", [])
+    merged["workflows"] = state["api_design"].get("workflows", [])
+    merged["compliance_check"] = raw_json.get("compliance_check", "")
+    merged["api_compliance_check"] = state["api_design"].get("compliance_check", "")
+
+    sql_ddl = generate_ddl_from_tables(new_tables)
+    api_endpoints = [
+        f"{a.get('method','GET').upper()} {a.get('path','')} - {a.get('description','')}"
+        for a in merged.get("apis", []) if isinstance(a, dict) and a.get("path")
+    ]
+    
+    sanitized_mermaid = sanitize_mermaid_er(new_mermaid, new_tables)
+    merged["data_model"]["mermaid_er"] = sanitized_mermaid
+
+    new_design_to_replace = {
+        "module": module_name,
+        "design": {
+            "er_diagram_mermaid": sanitized_mermaid,
+            "sql_ddl":            sql_ddl,
+            "api_endpoints":      api_endpoints,
+            "dfd_mermaid":        state["lld_design"].get("dfd_mermaid", ""),
+            "component_mermaid":  state["lld_design"].get("component_mermaid", ""),
+            "raw_json":           merged,
+        },
+        "selected_chunks": selected_chunks,
+    }
+
+    # Replace the old module design
+    for i, d in enumerate(domain_designs):
+        if d.get("module") == module_name:
+            domain_designs[i] = new_design_to_replace
+            break
+
+    # Re-generate global architecture (since a module design has changed)
+    arch_res = await generate_global_architecture(
+        domain_designs,
+        tech_stack=state["tech_stack"],
+        design_principles=state["design_principles"],
+        security_protocols=state["security_protocols"]
+    )
+
+    # Update cache values
+    cached_result["domainDesigns"] = domain_designs
+    cached_result["dataModelMarkdown"] = _build_data_model_markdown(domain_designs)
+    cached_result["systemDesignMarkdown"] = arch_res["architecture_markdown"]
+    cached_result["terraformCode"] = arch_res["terraform_code"]
+    cached_result["openapiSpec"] = arch_res.get("openapi_spec", "")
+    cached_result["generatedAt"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
+    # Write to cache
+    with open(cache_path, "w", encoding="utf-8") as f:
+        json.dump(cached_result, f, ensure_ascii=False, indent=2)
+
+    return cached_result
