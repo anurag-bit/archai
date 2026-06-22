@@ -6,6 +6,7 @@ import json
 import asyncio
 from typing import List, Dict, Any, Optional
 from langgraph.graph import StateGraph, END
+from langgraph.checkpoint.memory import MemorySaver
 
 from services.vector_store import (
     index_chunks_to_chroma,
@@ -38,16 +39,26 @@ from core.config import MAX_QA_RETRIES, MAX_CONCURRENT_MODULES
 
 def decide_after_qa(state: ModuleGraphState) -> str:
     """
-    Route to 'api_agent' on PASS, back to 'dba_agent' on failure.
-    Cap retries at MAX_QA_RETRIES to avoid infinite loops.
+    Route to 'api_agent' on PASS, human_input_node on failure if retries >= MAX_QA_RETRIES,
+    else back to 'dba_agent' on failure.
     """
     if state["qa_feedback"] == "PASS":
         return "api_agent"
     retries = state.get("qa_retries", 0)
     if retries >= MAX_QA_RETRIES:
-        print(f"[decide_after_qa] Max QA retries reached for '{state['current_module']}' — proceeding anyway")
-        return "api_agent"
+        print(f"[decide_after_qa] Max QA retries reached for '{state['current_module']}' — interrupting for human input")
+        return "human_input_node"
     return "dba_agent"
+
+
+async def human_input_node(state: ModuleGraphState) -> dict:
+    """
+    Dummy node that gets called when resuming from an interrupt.
+    The user's instructions will have been written to state['qa_feedback'] via aupdate_state.
+    We just reset qa_retries so the DBA agent has a fresh set of retries for this new instruction.
+    """
+    print(f"[human_input_node] Resuming execution for '{state['current_module']}' with human instruction: {state.get('qa_feedback')}")
+    return {"qa_retries": 0}
 
 
 # ─────────────────────────── Graph compilation ───────────────────────────────
@@ -59,6 +70,7 @@ def _build_module_graph() -> StateGraph:
     graph.add_node("fetch_context",      fetch_context_node)
     graph.add_node("dba_agent",          dba_agent_node)
     graph.add_node("qa_agent",           qa_agent_node)
+    graph.add_node("human_input_node",   human_input_node)
     graph.add_node("api_agent",          api_agent_node)
     graph.add_node("lld_agent",          lld_agent_node)
     graph.add_node("save_module_design", save_module_design_node)
@@ -67,6 +79,7 @@ def _build_module_graph() -> StateGraph:
     graph.set_entry_point("fetch_context")
     graph.add_edge("fetch_context",  "dba_agent")
     graph.add_edge("dba_agent",      "qa_agent")
+    graph.add_edge("human_input_node", "dba_agent")
     graph.add_edge("api_agent",      "lld_agent")
     graph.add_edge("lld_agent",      "save_module_design")
     graph.add_edge("save_module_design", END)
@@ -75,14 +88,24 @@ def _build_module_graph() -> StateGraph:
     graph.add_conditional_edges(
         "qa_agent",
         decide_after_qa,
-        {"api_agent": "api_agent", "dba_agent": "dba_agent"},
+        {
+            "api_agent": "api_agent", 
+            "dba_agent": "dba_agent", 
+            "human_input_node": "human_input_node"
+        },
     )
 
     return graph
 
 
-# Compiled app — reused across requests
-_module_workflow_app = _build_module_graph().compile()
+# Initialize checkpointer memory saver for Human in the loop (HITL)
+memory = MemorySaver()
+
+# Compiled app — compiled with MemorySaver checkpointer and configured to interrupt before human_input_node
+_module_workflow_app = _build_module_graph().compile(
+    checkpointer=memory,
+    interrupt_before=["human_input_node"]
+)
 
 # ─────────────────────────── Markdown renderer ───────────────────────────────
 
@@ -293,22 +316,30 @@ async def generate_system_design(
                     "security_protocols":  security_protocols,
                     "open_questions_answers": open_questions_answers,
                 }
-                final_state = await _module_workflow_app.ainvoke(initial_state)
-                return final_state.get("module_design") or {}
+                config = {"configurable": {"thread_id": f"{document_id}_{module_name}"}}
+                final_state = await _module_workflow_app.ainvoke(initial_state, config)
+                return final_state
 
         tasks = [run_module_workflow(m) for m in modules]
-        raw_designs = await asyncio.gather(*tasks)
-        domain_designs = [d for d in raw_designs if d]
-        print(f"LangGraph workflow complete. {len(domain_designs)} modules processed.")
-
-        # ── Phase 2 (Reduce): Global architecture ──────────────────────────
-        print("Generating production-grade global architecture...")
-        arch_res = await generate_global_architecture(
-            domain_designs,
-            tech_stack=tech_stack,
-            design_principles=design_principles,
-            security_protocols=security_protocols
-        )
+        final_states = await asyncio.gather(*tasks)
+        
+        domain_designs = []
+        interrupted_modules = []
+        interrupted_details = {}
+        
+        for state in final_states:
+            m = state.get("current_module")
+            design = state.get("module_design")
+            if design:
+                domain_designs.append(design)
+            else:
+                interrupted_modules.append(m)
+                interrupted_details[m] = {
+                    "dba_draft": state.get("dba_draft"),
+                    "qa_feedback": state.get("qa_feedback"),
+                }
+        
+        print(f"LangGraph workflow complete. {len(domain_designs)} completed, {len(interrupted_modules)} interrupted.")
 
         # ── Assemble retrieved chunks for highlights ────────────────────────
         all_chunks: Dict[int, Dict[str, Any]] = {}
@@ -326,8 +357,52 @@ async def generate_system_design(
                 f"Chunk {chunk['index'] + 1}{module_info} | score {chunk['score']}: {snippet}{dots}"
             )
 
+        # Handle interrupts
+        if interrupted_modules:
+            result = {
+                "status": "interrupted",
+                "documentId": document_id,
+                "projectSummary": f"Domain-driven design for {len(modules)} modules: {', '.join(modules)} (interrupted)",
+                "assumptions": [
+                    "Each module is designed independently to ensure comprehensive coverage.",
+                    "Global architecture provides integration patterns between modules.",
+                    "Database schemas are normalised per module with cross-module relationships.",
+                ],
+                "openQuestions": [],
+                "retrievalHighlights": highlights,
+                "documentText": normalized,
+                "modules": modules,
+                "domainDesigns": domain_designs,
+                "interruptedModules": interrupted_modules,
+                "interruptedModuleDetails": interrupted_details,
+                "generatedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                # Constraints
+                "techStack":            tech_stack,
+                "designPrinciples":     design_principles,
+                "securityProtocols":    security_protocols,
+                "openQuestionsAnswers": open_questions_answers,
+            }
+            # Write to cache
+            try:
+                with open(cache_path, "w", encoding="utf-8") as f:
+                    json.dump(result, f, ensure_ascii=False, indent=2)
+                print(f"✓ Cached interrupted design for document: {document_id}")
+            except Exception as e:
+                print(f"Cache write failed for {document_id}: {e}")
+            return result
+
+        # ── Phase 2 (Reduce): Global architecture ──────────────────────────
+        print("Generating production-grade global architecture...")
+        arch_res = await generate_global_architecture(
+            domain_designs,
+            tech_stack=tech_stack,
+            design_principles=design_principles,
+            security_protocols=security_protocols
+        )
+
         # ── Build final response ────────────────────────────────────────────
         result = {
+            "status": "completed",
             "projectSummary":       f"Domain-driven design for {len(modules)} modules: {', '.join(modules)}",
             "assumptions": [
                 "Each module is designed independently to ensure comprehensive coverage.",
@@ -639,6 +714,99 @@ async def apply_schema_patch(
     cached_result["systemDesignMarkdown"] = arch_res["architecture_markdown"]
     cached_result["terraformCode"] = arch_res["terraform_code"]
     cached_result["openapiSpec"] = arch_res.get("openapi_spec", "")
+    cached_result["generatedAt"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
+    # Write to cache
+    with open(cache_path, "w", encoding="utf-8") as f:
+        json.dump(cached_result, f, ensure_ascii=False, indent=2)
+
+    return cached_result
+
+
+async def resume_module_design(
+    document_id: str,
+    module_name: str,
+    instruction: str
+) -> Dict[str, Any]:
+    """
+    Resumes a paused module design workflow using checkpointer thread state.
+    Updates thread state with the developer's instructions and resumes execution.
+    If all modules are successfully completed, compiles global architecture and returns final response.
+    """
+    cache_dir  = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "cache")
+    cache_path = os.path.join(cache_dir, f"{document_id}.json")
+    if not os.path.exists(cache_path):
+        raise ValueError("Design not found")
+
+    with open(cache_path, "r", encoding="utf-8") as f:
+        cached_result = json.load(f)
+
+    # 1. Update checkpointer state with user instruction & reset retries
+    config = {"configurable": {"thread_id": f"{document_id}_{module_name}"}}
+    await _module_workflow_app.aupdate_state(
+        config,
+        {
+            "qa_feedback": f"HUMAN INSTRUCTION: {instruction}",
+            "qa_retries": 0
+        }
+    )
+
+    # 2. Resume graph execution from pause point
+    final_state = await _module_workflow_app.ainvoke(None, config)
+    new_design = final_state.get("module_design")
+
+    # 3. Handle results
+    domain_designs = cached_result.get("domainDesigns", [])
+    interrupted_modules = cached_result.get("interruptedModules", [])
+    interrupted_details = cached_result.get("interruptedModuleDetails", {})
+
+    if new_design:
+        # Module completed!
+        if module_name in interrupted_modules:
+            interrupted_modules.remove(module_name)
+        if module_name in interrupted_details:
+            del interrupted_details[module_name]
+
+        # Overwrite or append
+        existing_idx = next((i for i, d in enumerate(domain_designs) if d.get("module") == module_name), -1)
+        if existing_idx != -1:
+            domain_designs[existing_idx] = new_design
+        else:
+            domain_designs.append(new_design)
+    else:
+        # Still interrupted (failed QA audits again)
+        interrupted_details[module_name] = {
+            "dba_draft": final_state.get("dba_draft"),
+            "qa_feedback": final_state.get("qa_feedback"),
+        }
+
+    # 4. Check if all modules are completed now
+    if not interrupted_modules:
+        print("All modules completed. Generating global architecture...")
+        arch_res = await generate_global_architecture(
+            domain_designs,
+            tech_stack=cached_result.get("techStack", ""),
+            design_principles=cached_result.get("designPrinciples", ""),
+            security_protocols=cached_result.get("securityProtocols", "")
+        )
+
+        cached_result["status"] = "completed"
+        cached_result["domainDesigns"] = domain_designs
+        cached_result["dataModelMarkdown"] = _build_data_model_markdown(domain_designs)
+        cached_result["systemDesignMarkdown"] = arch_res["architecture_markdown"]
+        cached_result["terraformCode"] = arch_res["terraform_code"]
+        cached_result["openapiSpec"] = arch_res.get("openapi_spec", "")
+        if "interruptedModules" in cached_result:
+            del cached_result["interruptedModules"]
+        if "interruptedModuleDetails" in cached_result:
+            del cached_result["interruptedModuleDetails"]
+    else:
+        # Still interrupted (either this one failed again or others are pending)
+        cached_result["status"] = "interrupted"
+        cached_result["domainDesigns"] = domain_designs
+        cached_result["interruptedModules"] = interrupted_modules
+        cached_result["interruptedModuleDetails"] = interrupted_details
+
     cached_result["generatedAt"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
     # Write to cache

@@ -105,7 +105,7 @@ async def dba_agent_node(state: GraphState) -> dict:
     print(f"[dba_agent_node] Designing schema for '{module}' (attempt {retries + 1})")
 
     # ── DYNAMIC PROMPT: targeted patch on retries, full prompt on first attempt ──
-    if retries > 0 and feedback:
+    if (retries > 0 or "HUMAN INSTRUCTION" in feedback) and feedback:
         system_message = (
             "You are a Principal Database Architect performing a TARGETED PATCH. "
             "The QA agent found specific errors in your previous draft. "

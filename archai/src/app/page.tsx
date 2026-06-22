@@ -88,6 +88,7 @@ export default function Home() {
   const [selectedModuleIndex, setSelectedModuleIndex] = useState<number>(0);
   const [isRegeneratingModule, setIsRegeneratingModule] = useState(false);
   const [isPatchingSchema, setIsPatchingSchema] = useState(false);
+  const [isResumingDesign, setIsResumingDesign] = useState(false);
 
   // Advanced constraints states
   const [techStack, setTechStack] = useState("");
@@ -258,6 +259,39 @@ export default function Home() {
       setError(err.message || "Failed to save schema patch.");
     } finally {
       setIsPatchingSchema(false);
+    }
+  };
+
+  const handleResumeDesign = async (moduleName: string, instruction: string) => {
+    if (!result || !result.documentId) return;
+    setIsResumingDesign(true);
+    try {
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL !== undefined
+        ? process.env.NEXT_PUBLIC_BACKEND_URL
+        : "http://127.0.0.1:8080";
+      const fetchUrl = `${backendUrl}/api/design/${result.documentId}/resume`;
+      
+      const response = await fetch(fetchUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          module_name: moduleName,
+          instruction: instruction,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to resume design execution.");
+      }
+
+      const payload = (await response.json()) as DesignResponse;
+      setResult(payload);
+    } catch (err: any) {
+      setError(err.message || "Failed to resume design execution.");
+    } finally {
+      setIsResumingDesign(false);
     }
   };
 
@@ -452,23 +486,49 @@ export default function Home() {
                     <MarkdownRenderer content={`\`\`\`terraform\n${result.terraformCode || "# No terraform code generated."}\n\`\`\``} />
                   </div>
                 ) : previewMode ? (
-                  activeTab === "database" && result.domainDesigns && result.domainDesigns.length > 0 ? (
-                    <div className="flex flex-col lg:flex-row gap-6 min-h-[500px]">
-                      <ModuleSelector
-                        domainDesigns={result.domainDesigns}
-                        selectedModuleIndex={selectedModuleIndex}
-                        onSelectModule={setSelectedModuleIndex}
-                      />
-                      <ModuleSpec
-                        activeDesign={result.domainDesigns[selectedModuleIndex]}
-                        documentId={result.documentId}
-                        isRegenerating={isRegeneratingModule}
-                        onRegenerateModule={handleRegenerateModule}
-                        onPatchSchema={handlePatchSchema}
-                        isPatching={isPatchingSchema}
-                      />
-                    </div>
-                  ) : (
+                  activeTab === "database" && result.domainDesigns && result.domainDesigns.length > 0 ? (() => {
+                    const allModulesDisplay = result.modules?.map(name => {
+                      const completedDesign = result.domainDesigns?.find(d => d.module === name);
+                      if (completedDesign) {
+                        return {
+                          module: name,
+                          status: "completed" as const,
+                          design: completedDesign.design,
+                        };
+                      }
+                      const interruptedDetail = (result as any).interruptedModuleDetails?.[name];
+                      return {
+                        module: name,
+                        status: "interrupted" as const,
+                        design: {
+                          sql_ddl: interruptedDetail?.dba_draft ? "-- Partial schema design generated before interruption" : undefined,
+                          raw_json: interruptedDetail?.dba_draft ? { data_model: { tables: interruptedDetail.dba_draft.data_model?.tables || [] } } : undefined,
+                        },
+                        error: interruptedDetail?.qa_feedback,
+                      };
+                    }) || [];
+                    return (
+                      <div className="flex flex-col lg:flex-row gap-6 min-h-[500px]">
+                        <ModuleSelector
+                          domainDesigns={allModulesDisplay}
+                          selectedModuleIndex={selectedModuleIndex}
+                          onSelectModule={setSelectedModuleIndex}
+                        />
+                        {allModulesDisplay[selectedModuleIndex] && (
+                          <ModuleSpec
+                            activeDesign={allModulesDisplay[selectedModuleIndex]}
+                            documentId={result.documentId}
+                            isRegenerating={isRegeneratingModule}
+                            onRegenerateModule={handleRegenerateModule}
+                            onPatchSchema={handlePatchSchema}
+                            isPatching={isPatchingSchema}
+                            onResumeDesign={handleResumeDesign}
+                            isResuming={isResumingDesign}
+                          />
+                        )}
+                      </div>
+                    );
+                  })() : (
                     <MarkdownRenderer
                       content={
                         activeTab === "architecture"

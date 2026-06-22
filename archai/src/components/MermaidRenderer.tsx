@@ -239,6 +239,11 @@ export function MermaidRenderer({ chart }: { chart: string }) {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [svgDimensions, setSvgDimensions] = useState({ width: 800, height: 600 });
 
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isFsDropdownOpen, setIsFsDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const fsDropdownRef = useRef<HTMLDivElement>(null);
+
   // Transforms
   const [transform, setTransform] = useState({ x: 0, y: 0, scale: 1 });
   const [fullscreenTransform, setFullscreenTransform] = useState({ x: 0, y: 0, scale: 1 });
@@ -253,6 +258,133 @@ export function MermaidRenderer({ chart }: { chart: string }) {
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+      if (fsDropdownRef.current && !fsDropdownRef.current.contains(e.target as Node)) {
+        setIsFsDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideClick);
+    };
+  }, []);
+
+  const handleDownload = (format: "svg" | "png" | "pdf", activeContainerRef: React.RefObject<HTMLDivElement | null>) => {
+    const svgElement = activeContainerRef.current?.querySelector("svg");
+    if (!svgElement) return;
+
+    const svgClone = svgElement.cloneNode(true) as SVGElement;
+    const viewBox = svgElement.viewBox.baseVal;
+    const width = viewBox.width || svgElement.clientWidth || 800;
+    const height = viewBox.height || svgElement.clientHeight || 600;
+    
+    svgClone.setAttribute("width", width.toString());
+    svgClone.setAttribute("height", height.toString());
+    
+    const svgString = new XMLSerializer().serializeToString(svgClone);
+
+    if (format === "svg") {
+      const svgBlob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
+      const blobURL = URL.createObjectURL(svgBlob);
+      const downloadLink = document.createElement("a");
+      downloadLink.href = blobURL;
+      downloadLink.download = `diagram_${Date.now()}.svg`;
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      document.body.removeChild(downloadLink);
+      URL.revokeObjectURL(blobURL);
+    } else if (format === "png") {
+      const svgBlob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
+      const blobURL = URL.createObjectURL(svgBlob);
+      
+      const image = new Image();
+      image.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = width * 2;
+        canvas.height = height * 2;
+        const context = canvas.getContext("2d");
+        if (context) {
+          context.clearRect(0, 0, canvas.width, canvas.height);
+          context.drawImage(image, 0, 0, canvas.width, canvas.height);
+          
+          canvas.toBlob((blob) => {
+            if (blob) {
+              const downloadLink = document.createElement("a");
+              downloadLink.href = URL.createObjectURL(blob);
+              downloadLink.download = `diagram_${Date.now()}.png`;
+              document.body.appendChild(downloadLink);
+              downloadLink.click();
+              document.body.removeChild(downloadLink);
+            }
+            URL.revokeObjectURL(blobURL);
+          }, "image/png");
+        }
+      };
+      image.src = blobURL;
+    } else if (format === "pdf") {
+      const printWindow = window.open("", "_blank");
+      if (!printWindow) {
+        alert("Please allow popups to export PDF.");
+        return;
+      }
+      
+      const styledSvg = svgClone.cloneNode(true) as SVGElement;
+      styledSvg.setAttribute("width", "100%");
+      styledSvg.setAttribute("height", "100%");
+      styledSvg.style.maxWidth = "100%";
+      styledSvg.style.maxHeight = "100%";
+      const styledSvgString = new XMLSerializer().serializeToString(styledSvg);
+
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>Export PDF - System Diagram</title>
+            <style>
+              @page {
+                size: landscape;
+                margin: 10mm;
+              }
+              body {
+                margin: 0;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                height: 100vh;
+                background: #030712;
+                color: #f5f5f0;
+              }
+              .container {
+                width: 100%;
+                height: 100%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+              }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              ${styledSvgString}
+            </div>
+            <script>
+              window.onload = function() {
+                setTimeout(function() {
+                  window.print();
+                  window.close();
+                }, 500);
+              };
+            </script>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+    }
+  };
 
   // Inline render
   useEffect(() => {
@@ -505,6 +637,66 @@ export function MermaidRenderer({ chart }: { chart: string }) {
               <path strokeLinecap="round" strokeLinejoin="round" d="M4 8V4h4m12 4V4h-4M4 16v4h4m12-4v4h-4" />
             </svg>
           </button>
+
+          <div className="h-4 w-px bg-white/10 mx-1" />
+
+          {/* Download Dropdown */}
+          <div className="relative" ref={dropdownRef}>
+            <button
+              type="button"
+              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+              className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/5 transition-colors cursor-pointer"
+              title="Download Diagram"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+            </button>
+            
+            {isDropdownOpen && (
+              <div className="absolute right-0 mt-2 w-36 rounded-xl border border-white/10 bg-slate-950/90 backdrop-blur-md shadow-2xl p-1 z-30">
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleDownload("svg", containerRef);
+                    setIsDropdownOpen(false);
+                  }}
+                  className="w-full text-left px-2.5 py-1.5 rounded-lg text-[10px] font-semibold text-slate-350 hover:text-white hover:bg-white/5 transition flex items-center gap-2 cursor-pointer"
+                >
+                  <svg className="w-3.5 h-3.5 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                  </svg>
+                  <span>SVG Format (.svg)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleDownload("png", containerRef);
+                    setIsDropdownOpen(false);
+                  }}
+                  className="w-full text-left px-2.5 py-1.5 rounded-lg text-[10px] font-semibold text-slate-350 hover:text-white hover:bg-white/5 transition flex items-center gap-2 cursor-pointer"
+                >
+                  <svg className="w-3.5 h-3.5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  <span>PNG Image (.png)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleDownload("pdf", containerRef);
+                    setIsDropdownOpen(false);
+                  }}
+                  className="w-full text-left px-2.5 py-1.5 rounded-lg text-[10px] font-semibold text-slate-350 hover:text-white hover:bg-white/5 transition flex items-center gap-2 cursor-pointer"
+                >
+                  <svg className="w-3.5 h-3.5 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                  </svg>
+                  <span>PDF Document (.pdf)</span>
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Viewport */}
@@ -585,6 +777,66 @@ export function MermaidRenderer({ chart }: { chart: string }) {
                   <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 7.89M9 11l3-3 3 3" />
                 </svg>
               </button>
+
+              <div className="h-4 w-px bg-white/10 mx-1" />
+
+              {/* Fullscreen Download Dropdown */}
+              <div className="relative" ref={fsDropdownRef}>
+                <button
+                  type="button"
+                  onClick={() => setIsFsDropdownOpen(!isFsDropdownOpen)}
+                  className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/5 transition-colors cursor-pointer"
+                  title="Download Diagram"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                </button>
+                
+                {isFsDropdownOpen && (
+                  <div className="absolute right-0 mt-2 w-36 rounded-xl border border-white/10 bg-slate-950/90 backdrop-blur-md shadow-2xl p-1 z-30">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleDownload("svg", fullscreenContainerRef);
+                        setIsFsDropdownOpen(false);
+                      }}
+                      className="w-full text-left px-2.5 py-1.5 rounded-lg text-[10px] font-semibold text-slate-350 hover:text-white hover:bg-white/5 transition flex items-center gap-2 cursor-pointer"
+                    >
+                      <svg className="w-3.5 h-3.5 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                      </svg>
+                      <span>SVG Format (.svg)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleDownload("png", fullscreenContainerRef);
+                        setIsFsDropdownOpen(false);
+                      }}
+                      className="w-full text-left px-2.5 py-1.5 rounded-lg text-[10px] font-semibold text-slate-350 hover:text-white hover:bg-white/5 transition flex items-center gap-2 cursor-pointer"
+                    >
+                      <svg className="w-3.5 h-3.5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                      <span>PNG Image (.png)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleDownload("pdf", fullscreenContainerRef);
+                        setIsFsDropdownOpen(false);
+                      }}
+                      className="w-full text-left px-2.5 py-1.5 rounded-lg text-[10px] font-semibold text-slate-350 hover:text-white hover:bg-white/5 transition flex items-center gap-2 cursor-pointer"
+                    >
+                      <svg className="w-3.5 h-3.5 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                      </svg>
+                      <span>PDF Document (.pdf)</span>
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Viewport container */}

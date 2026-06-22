@@ -3,7 +3,7 @@ import traceback
 from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, Form, File, UploadFile, HTTPException
 from pydantic import BaseModel
-from services.design import generate_system_design, regenerate_module_design, apply_schema_patch
+from services.design import generate_system_design, regenerate_module_design, apply_schema_patch, resume_module_design
 from utils.pdf_parser import extract_pdf_text
 
 router = APIRouter()
@@ -97,4 +97,25 @@ async def patch_schema_endpoint(document_id: str, module_name: str, req: PatchSc
         raise HTTPException(
             status_code=500,
             detail={"error": "An internal error occurred during schema patching", "requestId": request_id}
+        )
+
+
+class ResumeDesignRequest(BaseModel):
+    module_name: str
+    instruction: str
+
+
+@router.post("/api/design/{document_id}/resume")
+async def resume_design_endpoint(document_id: str, req: ResumeDesignRequest):
+    try:
+        result = await resume_module_design(document_id, req.module_name, req.instruction)
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        request_id = str(uuid.uuid4())
+        print(f"[Request {request_id}] Resume design error: {traceback.format_exc()}")
+        raise HTTPException(
+            status_code=500,
+            detail={"error": "An internal error occurred during design resumption", "requestId": request_id}
         )
