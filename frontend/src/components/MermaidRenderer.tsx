@@ -150,95 +150,96 @@ interface IconMapItem {
 
 const ICON_MAPPING: IconMapItem[] = [
   // Frameworks & Libraries
-  { keywords: ["next.js", "nextjs"], url: "https://skillicons.dev/icons?i=nextjs" },
-  { keywords: ["react"], url: "https://skillicons.dev/icons?i=react" },
-  { keywords: ["vue"], url: "https://skillicons.dev/icons?i=vue" },
-  { keywords: ["angular"], url: "https://skillicons.dev/icons?i=angular" },
-  { keywords: ["svelte"], url: "https://skillicons.dev/icons?i=svelte" },
-  { keywords: ["fastapi"], url: "https://skillicons.dev/icons?i=fastapi" },
-  { keywords: ["django"], url: "https://skillicons.dev/icons?i=django" },
-  { keywords: ["flask"], url: "https://skillicons.dev/icons?i=flask" },
-  { keywords: ["express"], url: "https://skillicons.dev/icons?i=express" },
-  { keywords: ["nestjs", "nest.js"], url: "https://skillicons.dev/icons?i=nest" },
-  { keywords: ["spring boot", "spring framework", "spring"], url: "https://skillicons.dev/icons?i=spring" },
-  { keywords: ["laravel"], url: "https://skillicons.dev/icons?i=laravel" },
-  { keywords: ["flutter"], url: "https://skillicons.dev/icons?i=flutter" },
+  { keywords: ["next.js", "nextjs"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/next.svg" },
+  { keywords: ["react"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/react.svg" },
+  { keywords: ["vue"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/vue.svg" },
+  { keywords: ["angular"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/angular.svg" },
+  { keywords: ["svelte"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/svelte.svg" },
+  { keywords: ["fastapi"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/fastapi.svg" },
+  { keywords: ["django"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/django.svg" },
+  { keywords: ["flask"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/flask.svg" },
+  { keywords: ["express"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/express.svg" },
+  { keywords: ["nestjs", "nest.js"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/nest.svg" },
+  { keywords: ["spring boot", "springboot"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/springboot.svg" },
+  { keywords: ["spring framework", "spring"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/spring.svg" },
+  { keywords: ["laravel"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/laravel.svg" },
+  { keywords: ["flutter"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/flutter.svg" },
 
   // Databases & Caches
-  { keywords: ["postgresql", "postgres"], url: "https://skillicons.dev/icons?i=postgres" },
-  { keywords: ["redis"], url: "https://skillicons.dev/icons?i=redis" },
-  { keywords: ["mysql"], url: "https://skillicons.dev/icons?i=mysql" },
-  { keywords: ["mongodb", "mongo"], url: "https://skillicons.dev/icons?i=mongodb" },
-  { keywords: ["sqlite"], url: "https://skillicons.dev/icons?i=sqlite" },
-  { keywords: ["cassandra"], url: "https://skillicons.dev/icons?i=cassandra" },
-  { keywords: ["dynamodb"], url: "https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/amazondynamodb.svg", invert: true },
-  { keywords: ["elasticsearch", "opensearch"], url: "https://skillicons.dev/icons?i=elasticsearch" },
-  { keywords: ["supabase"], url: "https://skillicons.dev/icons?i=supabase" },
-  { keywords: ["firebase"], url: "https://skillicons.dev/icons?i=firebase" },
-  { keywords: ["prisma"], url: "https://skillicons.dev/icons?i=prisma" },
+  { keywords: ["postgresql", "postgres"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/postgres.svg" },
+  { keywords: ["redis"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/redis.svg" },
+  { keywords: ["mysql"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/mysql.svg" },
+  { keywords: ["mongodb", "mongo"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/mongodb.svg" },
+  { keywords: ["sqlite"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/sqlite.svg" },
+  { keywords: ["cassandra"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/cassandra.svg" },
+  { keywords: ["dynamodb"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/aws-dynamodb.svg" },
+  { keywords: ["elasticsearch", "opensearch"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/elasticsearch.svg" },
+  { keywords: ["supabase"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/supabase.svg" },
+  { keywords: ["firebase"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/firebase.svg" },
+  { keywords: ["prisma"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/prisma.svg" },
 
   // Languages & Runtimes
-  { keywords: ["nodejs", "node.js", "node run"], url: "https://skillicons.dev/icons?i=nodejs" },
-  { keywords: ["python"], url: "https://skillicons.dev/icons?i=python" },
-  { keywords: ["golang", "go lang"], url: "https://skillicons.dev/icons?i=go" },
-  { keywords: ["rust"], url: "https://skillicons.dev/icons?i=rust" },
-  { keywords: ["java "], url: "https://skillicons.dev/icons?i=java" },
-  { keywords: ["typescript", "ts"], url: "https://skillicons.dev/icons?i=ts" },
-  { keywords: ["javascript", "js"], url: "https://skillicons.dev/icons?i=js" },
-  { keywords: ["cpp", "c++"], url: "https://skillicons.dev/icons?i=cpp" },
-  { keywords: ["ruby"], url: "https://skillicons.dev/icons?i=ruby" },
-  { keywords: ["php"], url: "https://skillicons.dev/icons?i=php" },
-  { keywords: ["elixir"], url: "https://skillicons.dev/icons?i=elixir" },
-  { keywords: ["swift"], url: "https://skillicons.dev/icons?i=swift" },
-  { keywords: ["kotlin"], url: "https://skillicons.dev/icons?i=kotlin" },
+  { keywords: ["nodejs", "node.js", "node run"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/node.svg" },
+  { keywords: ["python"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/python.svg" },
+  { keywords: ["golang", "go lang"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/go.svg" },
+  { keywords: ["rust"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/rust.svg" },
+  { keywords: ["java "], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/java.svg" },
+  { keywords: ["typescript", "ts"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/typescript.svg" },
+  { keywords: ["javascript", "js"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/javascript.svg" },
+  { keywords: ["cpp", "c++"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/cpp.svg" },
+  { keywords: ["ruby"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/ruby.svg" },
+  { keywords: ["php"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/php.svg" },
+  { keywords: ["elixir"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/elixir.svg" },
+  { keywords: ["swift"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/swift.svg" },
+  { keywords: ["kotlin"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/kotlin.svg" },
 
   // DevOps & Server
-  { keywords: ["docker"], url: "https://skillicons.dev/icons?i=docker" },
-  { keywords: ["kubernetes", "k8s", "eks", "gke", "aks"], url: "https://skillicons.dev/icons?i=kubernetes" },
-  { keywords: ["terraform"], url: "https://skillicons.dev/icons?i=terraform" },
-  { keywords: ["ansible"], url: "https://skillicons.dev/icons?i=ansible" },
-  { keywords: ["nginx"], url: "https://skillicons.dev/icons?i=nginx" },
-  { keywords: ["apache kafka", "kafka"], url: "https://skillicons.dev/icons?i=kafka" },
-  { keywords: ["rabbitmq"], url: "https://skillicons.dev/icons?i=rabbitmq" },
-  { keywords: ["prometheus"], url: "https://skillicons.dev/icons?i=prometheus" },
-  { keywords: ["grafana"], url: "https://skillicons.dev/icons?i=grafana" },
-  { keywords: ["github actions", "github-actions"], url: "https://skillicons.dev/icons?i=githubactions" },
-  { keywords: ["jenkins"], url: "https://skillicons.dev/icons?i=jenkins" },
-  { keywords: ["gitlab"], url: "https://skillicons.dev/icons?i=gitlab" },
+  { keywords: ["docker"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/docker.svg" },
+  { keywords: ["kubernetes", "k8s", "eks", "gke", "aks"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/k8s-kubernetes.svg" },
+  { keywords: ["terraform"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/terraform.svg" },
+  { keywords: ["ansible"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/ansible.svg" },
+  { keywords: ["nginx"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/nginx.svg" },
+  { keywords: ["apache kafka", "kafka"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/kafka.svg" },
+  { keywords: ["rabbitmq"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/rabbitmq.svg" },
+  { keywords: ["prometheus"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/prometheus.svg" },
+  { keywords: ["grafana"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/grafana.svg" },
+  { keywords: ["github actions", "github-actions"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/github-actions.svg" },
+  { keywords: ["jenkins"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/jenkins.svg" },
+  { keywords: ["gitlab"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/gitlab.svg" },
 
   // Cloud Platforms
-  { keywords: ["cloudflare"], url: "https://skillicons.dev/icons?i=cloudflare" },
-  { keywords: ["vercel"], url: "https://skillicons.dev/icons?i=vercel" },
-  { keywords: ["netlify"], url: "https://skillicons.dev/icons?i=netlify" },
-  { keywords: ["heroku"], url: "https://skillicons.dev/icons?i=heroku" },
-  { keywords: ["digitalocean", "digital ocean"], url: "https://skillicons.dev/icons?i=digitalocean" },
+  { keywords: ["cloudflare"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/cloudflare.svg" },
+  { keywords: ["vercel"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/vercel.svg" },
+  { keywords: ["netlify"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/netlify.svg" },
+  { keywords: ["heroku"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/heroku.svg" },
+  { keywords: ["digitalocean", "digital ocean"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/digitalocean.svg" },
 
   // AWS Specific Services
-  { keywords: ["lambda"], url: "https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/awslambda.svg", invert: true },
-  { keywords: ["s3", "simple storage"], url: "https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/amazons3.svg", invert: true },
-  { keywords: ["rds", "relational database"], url: "https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/amazonrds.svg", invert: true },
-  { keywords: ["sqs", "simple queue"], url: "https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/amazonsqs.svg", invert: true },
-  { keywords: ["sns", "simple notification"], url: "https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/amazonsns.svg", invert: true },
-  { keywords: ["cloudfront"], url: "https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/amazoncloudfront.svg", invert: true },
-  { keywords: ["api gateway", "apigateway"], url: "https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/amazonapigateway.svg", invert: true },
-  { keywords: ["route 53", "route53"], url: "https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/amazonroute53.svg", invert: true },
-  { keywords: ["cognito"], url: "https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/amazoncognito.svg", invert: true },
-  { keywords: ["ecs", "elastic container service"], url: "https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/amazonecs.svg", invert: true },
-  { keywords: ["ec2", "elastic compute cloud"], url: "https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/amazonec2.svg", invert: true },
-  { keywords: ["waf", "web application firewall"], url: "https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/amazoneks.svg", invert: true },
-  { keywords: ["aws", "amazon"], url: "https://skillicons.dev/icons?i=aws" },
+  { keywords: ["lambda"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/aws-lambda.svg" },
+  { keywords: ["s3", "simple storage"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/aws-simple-storage-service.svg" },
+  { keywords: ["rds", "relational database"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/aws-rds.svg" },
+  { keywords: ["sqs", "simple queue"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/aws-simple-queue-service.svg" },
+  { keywords: ["sns", "simple notification"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/aws-simple-notification-service.svg" },
+  { keywords: ["cloudfront"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/aws-cloudfront.svg" },
+  { keywords: ["api gateway", "apigateway"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/aws-api-gateway.svg" },
+  { keywords: ["route 53", "route53"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/aws-route-53.svg" },
+  { keywords: ["cognito"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/aws-cognito.svg" },
+  { keywords: ["ecs", "elastic container service"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/aws-elastic-container-service.svg" },
+  { keywords: ["ec2", "elastic compute cloud"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/aws-ec2.svg" },
+  { keywords: ["waf", "web application firewall"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/aws-waf.svg" },
+  { keywords: ["aws", "amazon"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/aws.svg" },
 
   // GCP / Google Cloud
-  { keywords: ["google cloud platform", "google cloud", "gcp"], url: "https://skillicons.dev/icons?i=gcp" },
+  { keywords: ["google cloud platform", "google cloud", "gcp"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/google-cloud.svg" },
 
   // Azure
-  { keywords: ["azure"], url: "https://skillicons.dev/icons?i=azure" },
+  { keywords: ["azure"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/azure.svg" },
 
   // AI & ML
-  { keywords: ["openai", "chatgpt"], url: "https://skillicons.dev/icons?i=openai" },
-  { keywords: ["hugging face", "huggingface"], url: "https://skillicons.dev/icons?i=huggingface" },
-  { keywords: ["pytorch"], url: "https://skillicons.dev/icons?i=pytorch" },
-  { keywords: ["tensorflow"], url: "https://skillicons.dev/icons?i=tensorflow" },
+  { keywords: ["openai", "chatgpt"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/openai.svg" },
+  { keywords: ["hugging face", "huggingface"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/hugging-face.svg" },
+  { keywords: ["pytorch"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/pytorch.svg" },
+  { keywords: ["tensorflow"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/tensorflow.svg" },
 ];
 
 function getIconForTech(techName: string): IconMapItem | null {
@@ -278,34 +279,83 @@ function injectTechnologyIcons(chart: string): string {
     "tb", "td", "bt", "rl", "lr"
   ]);
 
+  const EXPECTED_CLOSE: Record<string, string> = {
+    "[": "]",
+    "(": ")",
+    "[(": ")]",
+    "([": "])",
+    "[[": "]]",
+    "((": "))",
+    "{{": "}}",
+    "[\\": "/]",
+    "[/": "\\",
+    ">": "]",
+    "{": "}"
+  };
+
   const nodeRegex = /\b([a-zA-Z0-9_-]+)\s*(?:(\(\[|\[\(|\[\[|\(\(|\{\{|\[\/|\[\\|\[|\(|\{|\>))\s*("?)(.*?)\3\s*(?:(\]\)|\)\]|\]\]|\)\)|\}\}|\/\]|\\\]|\]|\)|\}))/g;
 
-  return chart.replace(nodeRegex, (match, nodeId, openBrackets, quote, labelText, closeBrackets) => {
-    if (RESERVED_KEYWORDS.has(nodeId.toLowerCase())) {
-      return match;
+  const lines = chart.split("\n");
+  const processedLines = lines.map(line => {
+    const trimmedLine = line.trim();
+    const lowerLine = trimmedLine.toLowerCase();
+
+    // Ignore lines that setup boundaries, subgraphs, styling, or link styles
+    if (
+      lowerLine.startsWith("subgraph") ||
+      lowerLine.startsWith("style") ||
+      lowerLine.startsWith("classdef") ||
+      lowerLine.startsWith("linkstyle")
+    ) {
+      return line;
     }
 
-    const iconInfo = getIconForTech(labelText);
-    if (iconInfo) {
-      if (labelText.includes("<img")) {
+    return line.replace(nodeRegex, (match, nodeId, openBrackets, quote, labelText, closeBrackets) => {
+      if (RESERVED_KEYWORDS.has(nodeId.toLowerCase())) {
         return match;
       }
-      
-      const filterStyle = iconInfo.invert ? "filter: invert(1) brightness(2);" : "";
-      const imgTag = `<img src='${iconInfo.url}' width='20' height='20' style='vertical-align: middle; margin-right: 6px; display: inline-block; ${filterStyle}'/>`;
-      
-      return `${nodeId}${openBrackets}"${imgTag}${labelText.replace(/"/g, "'")}"${closeBrackets}`;
-    }
 
-    // Always wrap node label in double quotes to prevent syntax errors due to special characters/spaces
-    return `${nodeId}${openBrackets}"${labelText.replace(/"/g, "'")}"${closeBrackets}`;
+      // Handle mismatched brackets from greedy/non-greedy regex matching (e.g. matching ']' vs ')]')
+      let finalLabel = labelText;
+      let finalClose = closeBrackets;
+      const expectedClose = EXPECTED_CLOSE[openBrackets];
+      if (expectedClose && closeBrackets !== expectedClose) {
+        if (closeBrackets.endsWith(expectedClose)) {
+          const extra = closeBrackets.slice(0, -expectedClose.length);
+          finalLabel = labelText + extra;
+          finalClose = expectedClose;
+        } else {
+          return match;
+        }
+      }
+
+      const iconInfo = getIconForTech(finalLabel);
+      if (iconInfo) {
+        if (finalLabel.includes("<img")) {
+          return match;
+        }
+        
+        const filterStyle = iconInfo.invert ? "filter: invert(1) brightness(2);" : "";
+        const imgTag = `<img src='${iconInfo.url}' width='20' height='20' style='vertical-align: middle; margin-right: 6px; display: inline-block; ${filterStyle}'/>`;
+        
+        return `${nodeId}${openBrackets}"${imgTag}${finalLabel.replace(/"/g, "'")}"${finalClose}`;
+      }
+
+      // Always wrap node label in double quotes to prevent syntax errors due to special characters/spaces
+      return `${nodeId}${openBrackets}"${finalLabel.replace(/"/g, "'")}"${finalClose}`;
+    });
   });
+
+  return processedLines.join("\n");
 }
 
 function preprocessMermaidChart(chart: string): string {
   if (!chart || typeof chart !== "string") return "";
 
-  let processed = injectTechnologyIcons(chart.trim());
+  // Fix common LLM shape typos: DB[((Database Store: PostgreSQL)]) -> DB[(Database Store: PostgreSQL)]
+  const cleaned = chart.replace(/\[\(\(+/g, "[(").replace(/\)\]\)+/g, ")]");
+
+  let processed = injectTechnologyIcons(cleaned.trim());
 
   if (!processed.includes("erDiagram")) {
     return processed;
@@ -387,6 +437,22 @@ const resetView = (
 
   setTransform({ x, y, scale: initialScale });
 };
+
+let renderQueue = Promise.resolve<any>(null);
+
+async function serializedRender(id: string, text: string): Promise<{ svg: string }> {
+  const currentQueue = renderQueue;
+  const nextRender = (async () => {
+    try {
+      await currentQueue;
+    } catch (e) {
+      // Ignore previous errors to keep queue moving
+    }
+    return mermaid.render(id, text);
+  })();
+  renderQueue = nextRender;
+  return nextRender;
+}
 
 export function MermaidRenderer({ chart }: { chart: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -556,7 +622,7 @@ export function MermaidRenderer({ chart }: { chart: string }) {
         setError(null);
         const cleanChart = preprocessMermaidChart(chart);
         const renderId = `mermaid-${Math.random().toString(36).substring(2, 9)}`;
-        const { svg } = await mermaid.render(renderId, cleanChart);
+        const { svg } = await serializedRender(renderId, cleanChart);
         
         if (active && containerRef.current) {
           containerRef.current.innerHTML = svg;
@@ -605,7 +671,7 @@ export function MermaidRenderer({ chart }: { chart: string }) {
       try {
         const cleanChart = preprocessMermaidChart(chart);
         const renderId = `mermaid-fs-${Math.random().toString(36).substring(2, 9)}`;
-        const { svg } = await mermaid.render(renderId, cleanChart);
+        const { svg } = await serializedRender(renderId, cleanChart);
         
         if (active && fullscreenContainerRef.current) {
           fullscreenContainerRef.current.innerHTML = svg;

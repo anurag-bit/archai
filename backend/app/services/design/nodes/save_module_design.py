@@ -97,12 +97,6 @@ def sanitize_mermaid_er(mermaid_er: str, tables: List[Dict[str, Any]]) -> str:
             sanitized_lines.append(line)
             continue
 
-        # Handle block delimiters
-        if "{" in line:
-            brace_depth += 1
-        if "}" in line:
-            brace_depth -= 1
-
         # Check if this is a relationship line
         # Relationship lines typically contain relation operators: ||, |o, o{, }o, --, ..
         is_relationship = False
@@ -110,6 +104,13 @@ def sanitize_mermaid_er(mermaid_er: str, tables: List[Dict[str, Any]]) -> str:
             if op in line and ":" in line:
                 is_relationship = True
                 break
+
+        # Handle block delimiters
+        if not is_relationship:
+            if "{" in line:
+                brace_depth += 1
+            if "}" in line:
+                brace_depth -= 1
                 
         if is_relationship:
             # Fix invalid relationship arrows (like -> or --> or --)

@@ -1,7 +1,8 @@
 from typing import List, Dict, Any
 import re
 from langchain_core.messages import HumanMessage, SystemMessage
-from services.design.helpers import get_chat_model
+from services.design.helpers import get_chat_model, invoke_with_retry_and_validation
+from services.design.validators import validate_devops_artifacts
 
 _ARCHITECT_SYSTEM = (
     "You are a Principal Cloud Solutions Architect. "
@@ -331,6 +332,63 @@ async def generate_openapi_spec(domain_designs: List[Dict[str, Any]]) -> str:
         content = re.sub(r"\n```$", "", content)
     return content.strip()
 
+_DEVOPS_SYSTEM = (
+    "You are an expert DevOps and Release Engineer.\n"
+    "Your job is to generate production-grade deployment configurations and CI/CD pipelines.\n"
+    "Based on the tech stack and the system architecture, you must generate a single JSON document structure containing:\n"
+    "1. dockerfile: A production-grade multi-stage Dockerfile.\n"
+    "2. docker_compose: A docker-compose.yml file for local development including DB, Redis, and App services.\n"
+    "3. ci_cd_pipeline: GitHub Actions or GitLab CI YAML pipeline (Lint -> Test -> Build -> Deploy).\n"
+    "4. k8s_config: Kubernetes Deployment and Service YAML configurations (or a Helm Chart structure).\n"
+    "Output ONLY a valid JSON object containing these four keys: 'dockerfile', 'docker_compose', 'ci_cd_pipeline', 'k8s_config'."
+)
+
+_DEVOPS_PROMPT = """\
+### TECH STACK
+{TECH_STACK}
+
+### SYSTEM ARCHITECTURE
+{ARCHITECTURE_MARKDOWN}
+
+### YOUR TASK
+Generate the release/deployment configurations and pipeline structure for this system.
+Output strict JSON with the following structure:
+{{
+  "dockerfile": "Multi-stage Dockerfile code...",
+  "docker_compose": "docker-compose.yml configuration code...",
+  "ci_cd_pipeline": "GitHub Actions or GitLab CI YAML configuration...",
+  "k8s_config": "Kubernetes Deployment & Service YAML configuration or Helm chart breakdown..."
+}}
+
+### GUIDELINES:
+1. Dockerfile:
+   - Use multi-stage builds to optimize size and security (e.g., build stage and runner stage with minimal base images).
+   - Follow best practices: non-root user, proper directories, cache package installations.
+2. Docker Compose:
+   - Define services for the app container, database (matching tech stack, e.g., Postgres), cache/queue (e.g., Redis/RabbitMQ), and configure ports and environment variables.
+3. CI/CD Pipeline:
+   - Create a clean workflow with stages: Lint (code format checks), Test (run tests), Build (build and push docker images), and Deploy (deployment template to staging/production).
+4. Kubernetes Config:
+   - Provide clean Deployment and Service resources. Include resource limits, readiness/liveness probes, env variables, and cluster IP / LoadBalancer services.
+"""
+
+async def generate_devops_pipeline(tech_stack: str, architecture_markdown: str) -> dict:
+    """Generate DevOps deployment artifacts (Dockerfile, Docker Compose, CI/CD, Kubernetes)."""
+    model = get_chat_model(temperature=0.1)
+    prompt = _DEVOPS_PROMPT.format(
+        TECH_STACK=tech_stack,
+        ARCHITECTURE_MARKDOWN=architecture_markdown
+    )
+    devops = await invoke_with_retry_and_validation(
+        model=model,
+        messages=[
+            SystemMessage(content=_DEVOPS_SYSTEM),
+            HumanMessage(content=prompt),
+        ],
+        validator=validate_devops_artifacts
+    )
+    return devops
+
 async def generate_global_architecture(
     domain_designs: List[Dict[str, Any]],
     tech_stack: str = "",
@@ -380,9 +438,15 @@ async def generate_global_architecture(
     terraform_code = await generate_terraform_code(arch_markdown, provider)
     openapi_spec = await generate_openapi_spec(domain_designs)
     
+    devops_artifacts = await generate_devops_pipeline(
+        tech_stack=tech_stack or f"Standard modern stack (Python, PostgreSQL, Redis) running on {provider.upper()}",
+        architecture_markdown=arch_markdown
+    )
+    
     return {
         "architecture_markdown": arch_markdown, 
         "terraform_code": terraform_code,
         "openapi_spec": openapi_spec,
+        "devops_artifacts": devops_artifacts,
         "module_count": len(domain_designs)
     }

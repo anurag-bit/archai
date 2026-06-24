@@ -7,6 +7,22 @@ type DomainDesign = {
     er_diagram_mermaid?: string;
     sql_ddl?: string;
     api_endpoints?: string[];
+    dfd_mermaid?: string;
+    component_mermaid?: string;
+    frontend_design?: {
+      component_tree_mermaid: string;
+      state_management: any;
+      routing_structure: any;
+      wireframe_descriptions: Array<{
+        view_name: string;
+        layout_description: string;
+      }>;
+    };
+    test_strategy?: {
+      bdd_scenarios?: any;
+      test_pyramid?: any;
+      load_testing?: any;
+    };
     raw_json?: any;
   };
   error?: string;

@@ -23,8 +23,30 @@ type DomainDesign = {
     api_endpoints?: string[];
     dfd_mermaid?: string;
     component_mermaid?: string;
+    frontend_design?: {
+      component_tree_mermaid: string;
+      state_management: any;
+      routing_structure: any;
+      wireframe_descriptions: Array<{
+        view_name: string;
+        layout_description: string;
+      }>;
+    };
+    test_strategy?: {
+      bdd_scenarios?: any;
+      test_pyramid?: any;
+      load_testing?: any;
+    };
+    raw_json?: any;
   };
   error?: string;
+};
+
+type ProjectPlan = {
+  effort_estimation: string;
+  sprint_breakdown: string;
+  dependency_graph: string;
+  risk_register: string;
 };
 
 type DesignResponse = {
@@ -36,6 +58,13 @@ type DesignResponse = {
   systemDesignMarkdown: string;
   terraformCode?: string;
   openapiSpec?: string;
+  devopsArtifacts?: {
+    dockerfile?: string;
+    docker_compose?: string;
+    ci_cd_pipeline?: string;
+    k8s_config?: string;
+  };
+  projectPlan?: ProjectPlan;
   documentId?: string;
   selectedChunkCount: number;
   documentLength: number;
@@ -79,12 +108,19 @@ export default function Home() {
   const [activeStep, setActiveStep] = useState(0);
   
   // Dashboard Workspace State
-  const [activeTab, setActiveTab] = useState<"architecture" | "database" | "requirements" | "terraform" | "openapi">("architecture");
+  const [activeTab, setActiveTab] = useState<"architecture" | "database" | "frontend" | "testing" | "requirements" | "terraform" | "openapi" | "devops" | "roadmap">("architecture");
   const [previewMode, setPreviewMode] = useState(true);
   const [copiedFull, setCopiedFull] = useState(false);
   const [copiedReqs, setCopiedReqs] = useState(false);
   const [copiedTerraform, setCopiedTerraform] = useState(false);
   const [copiedOpenApi, setCopiedOpenApi] = useState(false);
+  const [copiedDockerfile, setCopiedDockerfile] = useState(false);
+  const [copiedCompose, setCopiedCompose] = useState(false);
+  const [copiedCiCd, setCopiedCiCd] = useState(false);
+  const [copiedK8s, setCopiedK8s] = useState(false);
+  const [copiedRoadmapPart, setCopiedRoadmapPart] = useState(false);
+  const [activeDevopsSubTab, setActiveDevopsSubTab] = useState<"dockerfile" | "compose" | "cicd" | "k8s">("dockerfile");
+  const [activeRoadmapSubTab, setActiveRoadmapSubTab] = useState<"sprints" | "estimates" | "dependencies" | "risks">("sprints");
   const [selectedModuleIndex, setSelectedModuleIndex] = useState<number>(0);
   const [isRegeneratingModule, setIsRegeneratingModule] = useState(false);
   const [isPatchingSchema, setIsPatchingSchema] = useState(false);
@@ -299,7 +335,13 @@ export default function Home() {
     if (!result) return;
     const tfBlock = result.terraformCode ? `\n\n# Terraform IaC Configuration\n\n\`\`\`terraform\n${result.terraformCode}\n\`\`\`` : "";
     const apiBlock = result.openapiSpec ? `\n\n# OpenAPI 3.0 Specification\n\n\`\`\`yaml\n${result.openapiSpec}\n\`\`\`` : "";
-    const fullContent = `# System Architecture Report\nGenerated on ${new Date(result.generatedAt).toLocaleString()}\n\n## Project Summary\n${result.projectSummary}\n\n## Assumptions\n${result.assumptions.map(a => `- ${a}`).join('\n')}\n\n## Open Questions\n${result.openQuestions.map(q => `- ${q}`).join('\n')}\n\n${result.dataModelMarkdown}\n\n${result.systemDesignMarkdown}${tfBlock}${apiBlock}`;
+    const devopsBlock = result.devopsArtifacts
+      ? `\n\n# DevOps & Deployment Configurations\n\n## Dockerfile\n\`\`\`dockerfile\n${result.devopsArtifacts.dockerfile || ""}\n\`\`\`\n\n## docker-compose.yml\n\`\`\`yaml\n${result.devopsArtifacts.docker_compose || ""}\n\`\`\`\n\n## CI/CD Pipeline\n\`\`\`yaml\n${result.devopsArtifacts.ci_cd_pipeline || ""}\n\`\`\`\n\n## Kubernetes Config\n\`\`\`yaml\n${result.devopsArtifacts.k8s_config || ""}\n\`\`\``
+      : "";
+    const pmBlock = result.projectPlan
+      ? `\n\n# Project Roadmap & Plan\n\n## Effort Estimation\n${result.projectPlan.effort_estimation}\n\n## Sprint Breakdown\n${result.projectPlan.sprint_breakdown}\n\n## Dependency Graph\n\`\`\`mermaid\n${result.projectPlan.dependency_graph}\n\`\`\`\n\n## Risk Register\n${result.projectPlan.risk_register}`
+      : "";
+    const fullContent = `# System Architecture Report\nGenerated on ${new Date(result.generatedAt).toLocaleString()}\n\n## Project Summary\n${result.projectSummary}\n\n## Assumptions\n${result.assumptions.map(a => `- ${a}`).join('\n')}\n\n## Open Questions\n${result.openQuestions.map(q => `- ${q}`).join('\n')}\n\n${result.dataModelMarkdown}\n\n${result.systemDesignMarkdown}${tfBlock}${apiBlock}${devopsBlock}${pmBlock}`;
     try {
       await navigator.clipboard.writeText(fullContent);
       setCopiedFull(true);
@@ -313,7 +355,13 @@ export default function Home() {
     if (!result) return;
     const tfBlock = result.terraformCode ? `\n\n# Terraform IaC Configuration\n\n\`\`\`terraform\n${result.terraformCode}\n\`\`\`` : "";
     const apiBlock = result.openapiSpec ? `\n\n# OpenAPI 3.0 Specification\n\n\`\`\`yaml\n${result.openapiSpec}\n\`\`\`` : "";
-    const fullContent = `# System Architecture Report\nGenerated on ${new Date(result.generatedAt).toLocaleString()}\n\n## Project Summary\n${result.projectSummary}\n\n## Assumptions\n${result.assumptions.map(a => `- ${a}`).join('\n')}\n\n## Open Questions\n${result.openQuestions.map(q => `- ${q}`).join('\n')}\n\n${result.dataModelMarkdown}\n\n${result.systemDesignMarkdown}${tfBlock}${apiBlock}`;
+    const devopsBlock = result.devopsArtifacts
+      ? `\n\n# DevOps & Deployment Configurations\n\n## Dockerfile\n\`\`\`dockerfile\n${result.devopsArtifacts.dockerfile || ""}\n\`\`\`\n\n## docker-compose.yml\n\`\`\`yaml\n${result.devopsArtifacts.docker_compose || ""}\n\`\`\`\n\n## CI/CD Pipeline\n\`\`\`yaml\n${result.devopsArtifacts.ci_cd_pipeline || ""}\n\`\`\`\n\n## Kubernetes Config\n\`\`\`yaml\n${result.devopsArtifacts.k8s_config || ""}\n\`\`\``
+      : "";
+    const pmBlock = result.projectPlan
+      ? `\n\n# Project Roadmap & Plan\n\n## Effort Estimation\n${result.projectPlan.effort_estimation}\n\n## Sprint Breakdown\n${result.projectPlan.sprint_breakdown}\n\n## Dependency Graph\n\`\`\`mermaid\n${result.projectPlan.dependency_graph}\n\`\`\`\n\n## Risk Register\n${result.projectPlan.risk_register}`
+      : "";
+    const fullContent = `# System Architecture Report\nGenerated on ${new Date(result.generatedAt).toLocaleString()}\n\n## Project Summary\n${result.projectSummary}\n\n## Assumptions\n${result.assumptions.map(a => `- ${a}`).join('\n')}\n\n## Open Questions\n${result.openQuestions.map(q => `- ${q}`).join('\n')}\n\n${result.dataModelMarkdown}\n\n${result.systemDesignMarkdown}${tfBlock}${apiBlock}${devopsBlock}${pmBlock}`;
     const blob = new Blob([fullContent], { type: "text/markdown;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -485,8 +533,203 @@ export default function Home() {
                     </div>
                     <MarkdownRenderer content={`\`\`\`terraform\n${result.terraformCode || "# No terraform code generated."}\n\`\`\``} />
                   </div>
+                ) : activeTab === "devops" ? (
+                  <div className="space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-white/10 pb-4 gap-4">
+                      <div>
+                        <h2 className="text-base font-semibold text-white">CI/CD & Deployment Configurations</h2>
+                        <p className="text-xs text-slate-500 mt-1">Dockerfile, Docker Compose, CI/CD pipelines, and Kubernetes setups</p>
+                      </div>
+
+                      {/* Sub-tabs inside DevOps */}
+                      <div className="flex gap-1.5 bg-slate-900 border border-white/5 p-1 rounded-xl">
+                        {(["dockerfile", "compose", "cicd", "k8s"] as const).map((sub) => {
+                          const labels = {
+                            dockerfile: "Dockerfile",
+                            compose: "docker-compose.yml",
+                            cicd: "CI/CD Pipeline",
+                            k8s: "Kubernetes (K8s)"
+                          };
+                          return (
+                            <button
+                              key={sub}
+                              onClick={() => setActiveDevopsSubTab(sub)}
+                              className={`px-2.5 py-1 text-[10px] font-bold rounded-lg transition cursor-pointer ${
+                                activeDevopsSubTab === sub
+                                  ? "bg-cyan-400 text-slate-950"
+                                  : "text-slate-400 hover:text-slate-200"
+                              }`}
+                            >
+                              {labels[sub]}
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      <button
+                        onClick={async () => {
+                          if (result.devopsArtifacts) {
+                            try {
+                              let copyText = "";
+                              if (activeDevopsSubTab === "dockerfile") {
+                                copyText = result.devopsArtifacts.dockerfile || "";
+                                setCopiedDockerfile(true);
+                                setTimeout(() => setCopiedDockerfile(false), 2000);
+                              } else if (activeDevopsSubTab === "compose") {
+                                copyText = result.devopsArtifacts.docker_compose || "";
+                                setCopiedCompose(true);
+                                setTimeout(() => setCopiedCompose(false), 2000);
+                              } else if (activeDevopsSubTab === "cicd") {
+                                copyText = result.devopsArtifacts.ci_cd_pipeline || "";
+                                setCopiedCiCd(true);
+                                setTimeout(() => setCopiedCiCd(false), 2000);
+                              } else if (activeDevopsSubTab === "k8s") {
+                                copyText = result.devopsArtifacts.k8s_config || "";
+                                setCopiedK8s(true);
+                                setTimeout(() => setCopiedK8s(false), 2000);
+                              }
+                              await navigator.clipboard.writeText(copyText);
+                            } catch (err) {
+                              console.error(err);
+                            }
+                          }
+                        }}
+                        className="text-xs bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white px-3 py-1.5 rounded-lg border border-white/5 transition cursor-pointer flex items-center gap-1.5 font-semibold self-start sm:self-center"
+                      >
+                        {(activeDevopsSubTab === "dockerfile" && copiedDockerfile) ||
+                        (activeDevopsSubTab === "compose" && copiedCompose) ||
+                        (activeDevopsSubTab === "cicd" && copiedCiCd) ||
+                        (activeDevopsSubTab === "k8s" && copiedK8s) ? (
+                          <>
+                            <svg className="w-3.5 h-3.5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                            <span className="text-emerald-400">Copied!</span>
+                          </>
+                        ) : (
+                          <>
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" /></svg>
+                            <span>
+                              Copy{" "}
+                              {activeDevopsSubTab === "dockerfile"
+                                ? "Dockerfile"
+                                : activeDevopsSubTab === "compose"
+                                ? "docker-compose.yml"
+                                : activeDevopsSubTab === "cicd"
+                                ? "CI/CD Pipeline"
+                                : "Kubernetes Config"}
+                            </span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+
+                    {activeDevopsSubTab === "dockerfile" && (
+                      <MarkdownRenderer content={`\`\`\`dockerfile\n${result.devopsArtifacts?.dockerfile || "# No Dockerfile generated."}\n\`\`\``} />
+                    )}
+                    {activeDevopsSubTab === "compose" && (
+                      <MarkdownRenderer content={`\`\`\`yaml\n${result.devopsArtifacts?.docker_compose || "# No docker-compose.yml generated."}\n\`\`\``} />
+                    )}
+                    {activeDevopsSubTab === "cicd" && (
+                      <MarkdownRenderer content={`\`\`\`yaml\n${result.devopsArtifacts?.ci_cd_pipeline || "# No CI/CD pipeline configuration generated."}\n\`\`\``} />
+                    )}
+                    {activeDevopsSubTab === "k8s" && (
+                      <MarkdownRenderer content={`\`\`\`yaml\n${result.devopsArtifacts?.k8s_config || "# No Kubernetes configuration generated."}\n\`\`\``} />
+                    )}
+                  </div>
+                ) : activeTab === "roadmap" ? (
+                  <div className="space-y-6">
+                    <div className="flex flex-col md:flex-row md:items-center md:justify-between border-b border-white/10 pb-4 gap-4">
+                      <div>
+                        <h2 className="text-base font-semibold text-white">Project Development Roadmap & Plan</h2>
+                        <p className="text-xs text-slate-500 mt-1">Timeline, effort estimation, module dependencies, and technical risk register</p>
+                      </div>
+
+                      <div className="flex flex-wrap gap-1.5 bg-slate-900 border border-white/5 p-1 rounded-xl">
+                        {(["sprints", "estimates", "dependencies", "risks"] as const).map((sub) => {
+                          const labels = {
+                            sprints: "Sprint Schedule",
+                            estimates: "Effort Estimates",
+                            dependencies: "Dependency Flow",
+                            risks: "Risk Register"
+                          };
+                          return (
+                            <button
+                              key={sub}
+                              onClick={() => setActiveRoadmapSubTab(sub)}
+                              className={`px-2.5 py-1 text-[10px] font-bold rounded-lg transition cursor-pointer ${
+                                activeRoadmapSubTab === sub
+                                  ? "bg-cyan-400 text-slate-950"
+                                  : "text-slate-400 hover:text-slate-200"
+                              }`}
+                            >
+                              {labels[sub]}
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      <button
+                        onClick={async () => {
+                          if (result.projectPlan) {
+                            try {
+                              let copyText = "";
+                              if (activeRoadmapSubTab === "sprints") {
+                                copyText = result.projectPlan.sprint_breakdown;
+                              } else if (activeRoadmapSubTab === "estimates") {
+                                copyText = result.projectPlan.effort_estimation;
+                              } else if (activeRoadmapSubTab === "dependencies") {
+                                copyText = `\`\`\`mermaid\n${result.projectPlan.dependency_graph}\n\`\`\``;
+                              } else if (activeRoadmapSubTab === "risks") {
+                                copyText = result.projectPlan.risk_register;
+                              }
+                              await navigator.clipboard.writeText(copyText);
+                              setCopiedRoadmapPart(true);
+                              setTimeout(() => setCopiedRoadmapPart(false), 2000);
+                            } catch (err) {
+                              console.error(err);
+                            }
+                          }
+                        }}
+                        className="text-xs bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white px-3 py-1.5 rounded-lg border border-white/5 transition cursor-pointer flex items-center gap-1.5 font-semibold self-start md:self-center"
+                      >
+                        {copiedRoadmapPart ? (
+                          <>
+                            <svg className="w-3.5 h-3.5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                            <span className="text-emerald-400">Copied!</span>
+                          </>
+                        ) : (
+                          <>
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" /></svg>
+                            <span>Copy Section</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+
+                    {result.projectPlan ? (
+                      <div className="space-y-4">
+                        {activeRoadmapSubTab === "sprints" && (
+                          <MarkdownRenderer content={result.projectPlan.sprint_breakdown} />
+                        )}
+                        {activeRoadmapSubTab === "estimates" && (
+                          <MarkdownRenderer content={result.projectPlan.effort_estimation} />
+                        )}
+                        {activeRoadmapSubTab === "dependencies" && (
+                          <div className="p-4 bg-slate-950 border border-white/5 rounded-xl flex justify-center overflow-x-auto">
+                            <MarkdownRenderer content={`\`\`\`mermaid\n${result.projectPlan.dependency_graph}\n\`\`\``} />
+                          </div>
+                        )}
+                        {activeRoadmapSubTab === "risks" && (
+                          <MarkdownRenderer content={result.projectPlan.risk_register} />
+                        )}
+                      </div>
+                    ) : (
+                      <div className="text-center py-10 border border-dashed border-white/10 rounded-2xl">
+                        <p className="text-sm text-slate-400">No project plan roadmap is available for this design yet.</p>
+                      </div>
+                    )}
+                  </div>
                 ) : previewMode ? (
-                  activeTab === "database" && result.domainDesigns && result.domainDesigns.length > 0 ? (() => {
+                  (activeTab === "database" || activeTab === "frontend" || activeTab === "testing") && result.domainDesigns && result.domainDesigns.length > 0 ? (() => {
                     const allModulesDisplay = result.modules?.map(name => {
                       const completedDesign = result.domainDesigns?.find(d => d.module === name);
                       if (completedDesign) {
@@ -524,6 +767,7 @@ export default function Home() {
                             isPatching={isPatchingSchema}
                             onResumeDesign={handleResumeDesign}
                             isResuming={isResumingDesign}
+                            activeTab={activeTab}
                           />
                         )}
                       </div>

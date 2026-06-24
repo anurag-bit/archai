@@ -33,34 +33,9 @@ from services.design.nodes import (
     lld_agent_node,
     frontend_agent_node,
     save_module_design_node,
+    generate_pm_plan,
 )
 from core.config import MAX_QA_RETRIES, MAX_CONCURRENT_MODULES
-
-# ─────────────────────────── Routing logic ───────────────────────────────────
-
-def decide_after_qa(state: ModuleGraphState) -> str:
-    """
-    Route to 'api_agent' on PASS, human_input_node on failure if retries >= MAX_QA_RETRIES,
-    else back to 'dba_agent' on failure.
-    """
-    if state["qa_feedback"] == "PASS":
-        return "api_agent"
-    retries = state.get("qa_retries", 0)
-    if retries >= MAX_QA_RETRIES:
-        print(f"[decide_after_qa] Max QA retries reached for '{state['current_module']}' — interrupting for human input")
-        return "human_input_node"
-    return "dba_agent"
-
-
-async def human_input_node(state: ModuleGraphState) -> dict:
-    """
-    Dummy node that gets called when resuming from an interrupt.
-    The user's instructions will have been written to state['qa_feedback'] via aupdate_state.
-    We just reset qa_retries so the DBA agent has a fresh set of retries for this new instruction.
-    """
-    print(f"[human_input_node] Resuming execution for '{state['current_module']}' with human instruction: {state.get('qa_feedback')}")
-    return {"qa_retries": 0}
-
 
 # ─────────────────────────── Graph compilation ───────────────────────────────
 
@@ -70,9 +45,8 @@ def _build_module_graph() -> StateGraph:
     # Register nodes
     graph.add_node("fetch_context",      fetch_context_node)
     graph.add_node("dba_agent",          dba_agent_node)
-    graph.add_node("qa_agent",           qa_agent_node)
-    graph.add_node("human_input_node",   human_input_node)
     graph.add_node("api_agent",          api_agent_node)
+    graph.add_node("qa_agent",           qa_agent_node)
     graph.add_node("lld_agent",          lld_agent_node)
     graph.add_node("frontend_agent",     frontend_agent_node)
     graph.add_node("save_module_design", save_module_design_node)
@@ -80,34 +54,22 @@ def _build_module_graph() -> StateGraph:
     # Fixed edges
     graph.set_entry_point("fetch_context")
     graph.add_edge("fetch_context",  "dba_agent")
-    graph.add_edge("dba_agent",      "qa_agent")
-    graph.add_edge("human_input_node", "dba_agent")
-    graph.add_edge("api_agent",      "lld_agent")
+    graph.add_edge("dba_agent",      "api_agent")
+    graph.add_edge("api_agent",      "qa_agent")
+    graph.add_edge("qa_agent",       "lld_agent")
     graph.add_edge("lld_agent",      "frontend_agent")
     graph.add_edge("frontend_agent", "save_module_design")
     graph.add_edge("save_module_design", END)
 
-    # Conditional edges
-    graph.add_conditional_edges(
-        "qa_agent",
-        decide_after_qa,
-        {
-            "api_agent": "api_agent", 
-            "dba_agent": "dba_agent", 
-            "human_input_node": "human_input_node"
-        },
-    )
-
     return graph
 
 
-# Initialize checkpointer memory saver for Human in the loop (HITL)
+# Initialize checkpointer memory saver
 memory = MemorySaver()
 
-# Compiled app — compiled with MemorySaver checkpointer and configured to interrupt before human_input_node
+# Compiled app
 _module_workflow_app = _build_module_graph().compile(
-    checkpointer=memory,
-    interrupt_before=["human_input_node"]
+    checkpointer=memory
 )
 
 # ─────────────────────────── Markdown renderer ───────────────────────────────
@@ -223,6 +185,16 @@ def _build_data_model_markdown(domain_designs: List[Dict[str, Any]]) -> str:
                                 f"| `{tr.get('api_endpoint','')}` |"
                             )
                         lines.append("")
+
+            test_strategy = rich.get("test_strategy", {})
+            if test_strategy:
+                lines.append("### QA & Test Strategy\n")
+                if test_strategy.get("bdd_scenarios"):
+                    lines += ["#### BDD Gherkin Scenarios\n", f"{test_strategy['bdd_scenarios']}\n"]
+                if test_strategy.get("test_pyramid"):
+                    lines += ["#### Test Pyramid Plan\n", f"{test_strategy['test_pyramid']}\n"]
+                if test_strategy.get("load_testing"):
+                    lines += ["#### Load Testing Strategy\n", f"{test_strategy['load_testing']}\n"]
         else:
             # Legacy flat fallback
             mermaid = design.get("er_diagram_mermaid", "").strip()
@@ -313,6 +285,7 @@ async def generate_system_design(
                     "api_design":      {},
                     "lld_design":      {},
                     "frontend_design": {},
+                    "test_strategy":   {},
                     "module_design":   None,
                     # Architecture constraints
                     "tech_stack":          tech_stack,
@@ -395,14 +368,21 @@ async def generate_system_design(
                 print(f"Cache write failed for {document_id}: {e}")
             return result
 
-        # ── Phase 2 (Reduce): Global architecture ──────────────────────────
-        print("Generating production-grade global architecture...")
-        arch_res = await generate_global_architecture(
+        # ── Phase 2 (Reduce): Global architecture & PM project plan ─────────
+        print("Generating production-grade global architecture and PM project plan...")
+        arch_task = generate_global_architecture(
             domain_designs,
             tech_stack=tech_stack,
             design_principles=design_principles,
             security_protocols=security_protocols
         )
+        pm_task = generate_pm_plan(
+            domain_designs,
+            tech_stack=tech_stack,
+            design_principles=design_principles,
+            security_protocols=security_protocols
+        )
+        arch_res, pm_res = await asyncio.gather(arch_task, pm_task)
 
         # ── Build final response ────────────────────────────────────────────
         result = {
@@ -423,6 +403,8 @@ async def generate_system_design(
             "systemDesignMarkdown": arch_res["architecture_markdown"],
             "terraformCode":        arch_res["terraform_code"],
             "openapiSpec":          arch_res.get("openapi_spec", ""),
+            "devopsArtifacts":      arch_res.get("devops_artifacts", {}),
+            "projectPlan":          pm_res,
             "selectedChunkCount":   len(retrieved_chunks),
             "documentLength":       len(normalized),
             "generatedAt":          time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
@@ -508,6 +490,7 @@ async def regenerate_module_design(document_id: str, module_name: str) -> Dict[s
             "api_design":      {},
             "lld_design":      {},
             "frontend_design": {},
+            "test_strategy":   {},
             "module_design":   None,
             "tech_stack":          tech_stack,
             "design_principles":   design_principles,
@@ -525,13 +508,20 @@ async def regenerate_module_design(document_id: str, module_name: str) -> Dict[s
                 domain_designs[i] = new_design
                 break
 
-        # Re-generate global architecture (since a module design has changed)
-        arch_res = await generate_global_architecture(
+        # Re-generate global architecture and PM plan (since a module design has changed)
+        arch_task = generate_global_architecture(
             domain_designs,
             tech_stack=tech_stack,
             design_principles=design_principles,
             security_protocols=security_protocols
         )
+        pm_task = generate_pm_plan(
+            domain_designs,
+            tech_stack=tech_stack,
+            design_principles=design_principles,
+            security_protocols=security_protocols
+        )
+        arch_res, pm_res = await asyncio.gather(arch_task, pm_task)
 
         # Update cache values
         cached_result["domainDesigns"] = domain_designs
@@ -539,6 +529,8 @@ async def regenerate_module_design(document_id: str, module_name: str) -> Dict[s
         cached_result["systemDesignMarkdown"] = arch_res["architecture_markdown"]
         cached_result["terraformCode"] = arch_res["terraform_code"]
         cached_result["openapiSpec"] = arch_res.get("openapi_spec", "")
+        cached_result["devopsArtifacts"] = arch_res.get("devops_artifacts", {})
+        cached_result["projectPlan"] = pm_res
         cached_result["generatedAt"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
         # Write to cache
@@ -641,7 +633,7 @@ async def apply_schema_patch(
 
     module_context = format_chunks_as_context(selected_chunks)
 
-    # Build ModuleGraphState for running api_agent & lld_agent
+    # Build ModuleGraphState for running api_agent, qa_agent & lld_agent
     state = {
         "normalized_text": cached_result.get("documentText", ""),
         "document_id":     document_id,
@@ -655,6 +647,7 @@ async def apply_schema_patch(
         "api_design":      {},
         "lld_design":      {},
         "frontend_design": {},
+        "test_strategy":   {},
         "tech_stack":          cached_result.get("techStack", ""),
         "design_principles":   cached_result.get("designPrinciples", ""),
         "security_protocols":  cached_result.get("securityProtocols", ""),
@@ -664,6 +657,10 @@ async def apply_schema_patch(
     # Run API Agent node
     api_res = await api_agent_node(state)
     state["api_design"] = api_res["api_design"]
+
+    # Run QA Agent node (Test Strategy)
+    qa_res = await qa_agent_node(state)
+    state["test_strategy"] = qa_res["test_strategy"]
 
     # Run LLD Agent node
     lld_res = await lld_agent_node(state)
@@ -681,6 +678,7 @@ async def apply_schema_patch(
     merged["workflows"] = state["api_design"].get("workflows", [])
     merged["compliance_check"] = raw_json.get("compliance_check", "")
     merged["api_compliance_check"] = state["api_design"].get("compliance_check", "")
+    merged["test_strategy"] = state["test_strategy"]
 
     sql_ddl = generate_ddl_from_tables(new_tables)
     api_endpoints = [
@@ -700,6 +698,7 @@ async def apply_schema_patch(
             "dfd_mermaid":        state["lld_design"].get("dfd_mermaid", ""),
             "component_mermaid":  state["lld_design"].get("component_mermaid", ""),
             "frontend_design":    state.get("frontend_design") or {},
+            "test_strategy":      state.get("test_strategy") or {},
             "raw_json":           merged,
         },
         "selected_chunks": selected_chunks,
@@ -711,13 +710,20 @@ async def apply_schema_patch(
             domain_designs[i] = new_design_to_replace
             break
 
-    # Re-generate global architecture (since a module design has changed)
-    arch_res = await generate_global_architecture(
+    # Re-generate global architecture and PM plan (since a module design has changed)
+    arch_task = generate_global_architecture(
         domain_designs,
         tech_stack=state["tech_stack"],
         design_principles=state["design_principles"],
         security_protocols=state["security_protocols"]
     )
+    pm_task = generate_pm_plan(
+        domain_designs,
+        tech_stack=state["tech_stack"],
+        design_principles=state["design_principles"],
+        security_protocols=state["security_protocols"]
+    )
+    arch_res, pm_res = await asyncio.gather(arch_task, pm_task)
 
     # Update cache values
     cached_result["domainDesigns"] = domain_designs
@@ -725,6 +731,8 @@ async def apply_schema_patch(
     cached_result["systemDesignMarkdown"] = arch_res["architecture_markdown"]
     cached_result["terraformCode"] = arch_res["terraform_code"]
     cached_result["openapiSpec"] = arch_res.get("openapi_spec", "")
+    cached_result["devopsArtifacts"] = arch_res.get("devops_artifacts", {})
+    cached_result["projectPlan"] = pm_res
     cached_result["generatedAt"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
     # Write to cache
@@ -793,13 +801,20 @@ async def resume_module_design(
 
     # 4. Check if all modules are completed now
     if not interrupted_modules:
-        print("All modules completed. Generating global architecture...")
-        arch_res = await generate_global_architecture(
+        print("All modules completed. Generating global architecture and PM plan...")
+        arch_task = generate_global_architecture(
             domain_designs,
             tech_stack=cached_result.get("techStack", ""),
             design_principles=cached_result.get("designPrinciples", ""),
             security_protocols=cached_result.get("securityProtocols", "")
         )
+        pm_task = generate_pm_plan(
+            domain_designs,
+            tech_stack=cached_result.get("techStack", ""),
+            design_principles=cached_result.get("designPrinciples", ""),
+            security_protocols=cached_result.get("securityProtocols", "")
+        )
+        arch_res, pm_res = await asyncio.gather(arch_task, pm_task)
 
         cached_result["status"] = "completed"
         cached_result["domainDesigns"] = domain_designs
@@ -807,6 +822,8 @@ async def resume_module_design(
         cached_result["systemDesignMarkdown"] = arch_res["architecture_markdown"]
         cached_result["terraformCode"] = arch_res["terraform_code"]
         cached_result["openapiSpec"] = arch_res.get("openapi_spec", "")
+        cached_result["devopsArtifacts"] = arch_res.get("devops_artifacts", {})
+        cached_result["projectPlan"] = pm_res
         if "interruptedModules" in cached_result:
             del cached_result["interruptedModules"]
         if "interruptedModuleDetails" in cached_result:

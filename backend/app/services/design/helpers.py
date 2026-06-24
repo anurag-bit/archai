@@ -53,11 +53,18 @@ def parse_llm_json(content: str) -> Dict[str, Any]:
         content = content[3:]
     if content.endswith("```"):
         content = content[:-3]
+    
+    # Strip trailing commas right before a closing brace or bracket
+    content_str = re.sub(r',\s*([\]}])', r'\1', content.strip())
+    
     try:
-        return json.loads(content.strip())
-    except json.JSONDecodeError as e:
-        logger.warning(f"⚠️ JSON-DECODE-FAIL: Failed to parse JSON from LLM response ({e}). Returning raw fallback. Content snippet: {content[:200]}...")
-        return {"raw": content}
+        return json.loads(content_str)
+    except json.JSONDecodeError:
+        try:
+            return json.loads(content.strip())
+        except json.JSONDecodeError as e:
+            logger.warning(f"⚠️ JSON-DECODE-FAIL: Failed to parse JSON from LLM response ({e}). Returning raw fallback. Content snippet: {content[:200]}...")
+            return {"raw": content}
 
 
 def format_chunks_as_context(chunks: List[Dict[str, Any]]) -> str:

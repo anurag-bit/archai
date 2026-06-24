@@ -12,12 +12,17 @@ type DomainDesign = {
     component_mermaid?: string;
     frontend_design?: {
       component_tree_mermaid: string;
-      state_management: string;
-      routing_structure: string;
+      state_management: any;
+      routing_structure: any;
       wireframe_descriptions: Array<{
         view_name: string;
         layout_description: string;
       }>;
+    };
+    test_strategy?: {
+      bdd_scenarios?: any;
+      test_pyramid?: any;
+      load_testing?: any;
     };
     raw_json?: any;
   };
@@ -33,6 +38,7 @@ interface ModuleSpecProps {
   isPatching?: boolean;
   onResumeDesign?: (moduleName: string, instruction: string) => Promise<void>;
   isResuming?: boolean;
+  activeTab?: string;
 }
 
 export function ModuleSpec({
@@ -44,6 +50,7 @@ export function ModuleSpec({
   isPatching,
   onResumeDesign,
   isResuming,
+  activeTab = "database",
 }: ModuleSpecProps) {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [jsonText, setJsonText] = useState("");
@@ -305,16 +312,29 @@ export function ModuleSpec({
           content += `\n\n### Component Hierarchy Diagram\n\`\`\`mermaid\n${fd.component_tree_mermaid}\n\`\`\``;
         }
         if (fd.state_management) {
-          content += `\n\n### State Management\n${fd.state_management}`;
+          content += `\n\n### State Management\n${typeof fd.state_management === "object" ? JSON.stringify(fd.state_management, null, 2) : fd.state_management}`;
         }
         if (fd.routing_structure) {
-          content += `\n\n### Routing Structure\n${fd.routing_structure}`;
+          content += `\n\n### Routing Structure\n${typeof fd.routing_structure === "object" ? JSON.stringify(fd.routing_structure, null, 2) : fd.routing_structure}`;
         }
         if (fd.wireframe_descriptions && fd.wireframe_descriptions.length > 0) {
           content += `\n\n### Wireframes\n`;
           fd.wireframe_descriptions.forEach(wf => {
             content += `#### ${wf.view_name}\n${wf.layout_description}\n\n`;
           });
+        }
+      }
+      if (activeDesign.design?.test_strategy) {
+        const ts = activeDesign.design.test_strategy;
+        content += `\n\n## QA & Test Strategy`;
+        if (ts.bdd_scenarios) {
+          content += `\n\n### BDD Gherkin Scenarios\n${typeof ts.bdd_scenarios === "object" ? JSON.stringify(ts.bdd_scenarios, null, 2) : ts.bdd_scenarios}`;
+        }
+        if (ts.test_pyramid) {
+          content += `\n\n### Test Pyramid Plan\n${typeof ts.test_pyramid === "object" ? JSON.stringify(ts.test_pyramid, null, 2) : ts.test_pyramid}`;
+        }
+        if (ts.load_testing) {
+          content += `\n\n### Load Testing Strategy\n${typeof ts.load_testing === "object" ? JSON.stringify(ts.load_testing, null, 2) : ts.load_testing}`;
         }
       }
       await navigator.clipboard.writeText(content);
@@ -329,7 +349,11 @@ export function ModuleSpec({
       <div className="flex items-center justify-between border-b border-white/10 pb-4">
         <div>
           <h2 className="text-lg font-bold text-white leading-tight">{activeDesign.module}</h2>
-          <p className="text-xs text-slate-500 mt-1">Database and API Specification</p>
+          <p className="text-xs text-slate-500 mt-1">
+            {activeTab === "database" && "Database and API Specification"}
+            {activeTab === "frontend" && "Frontend UI Component and Routing Architecture"}
+            {activeTab === "testing" && "Quality Assurance and Testing Strategy"}
+          </p>
         </div>
         
         <div className="flex items-center gap-2">
@@ -387,138 +411,191 @@ export function ModuleSpec({
       </div>
 
       <div className="space-y-6">
-        {/* ER Diagram Section */}
-        {activeDesign.design?.er_diagram_mermaid && (
-          <div className="space-y-2.5">
-            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Entity Relationship Diagram</h4>
-            <div className="bg-slate-900/30 border border-white/5 rounded-2xl p-4 overflow-x-auto flex justify-center">
-              <MermaidRenderer chart={activeDesign.design.er_diagram_mermaid} />
-            </div>
-          </div>
-        )}
-
-        {/* Data Flow Diagram Section */}
-        {activeDesign.design?.dfd_mermaid && (
-          <div className="space-y-2.5">
-            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Data Flow Diagram (Level 1)</h4>
-            <div className="bg-slate-900/30 border border-white/5 rounded-2xl p-4 overflow-x-auto flex justify-center">
-              <MermaidRenderer chart={activeDesign.design.dfd_mermaid} />
-            </div>
-          </div>
-        )}
-
-        {/* Low-Level Component Diagram Section */}
-        {activeDesign.design?.component_mermaid && (
-          <div className="space-y-2.5">
-            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Low-Level Component Diagram</h4>
-            <div className="bg-slate-900/30 border border-white/5 rounded-2xl p-4 overflow-x-auto flex justify-center">
-              <MermaidRenderer chart={activeDesign.design.component_mermaid} />
-            </div>
-          </div>
-        )}
-
-        {/* SQL DDL Code block */}
-        {activeDesign.design?.sql_ddl && (
-          <div className="space-y-2.5">
-            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">PostgreSQL DDL</h4>
-            <pre className="text-xs text-slate-350 leading-5 whitespace-pre-wrap font-mono p-4 bg-slate-950/80 border border-white/5 rounded-2xl max-h-[350px] overflow-y-auto select-all">
-              {activeDesign.design.sql_ddl}
-            </pre>
-          </div>
-        )}
-
-        {/* API Endpoints with badges */}
-        {activeDesign.design?.api_endpoints && activeDesign.design.api_endpoints.length > 0 && (
-          <div className="space-y-2.5">
-            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-              API Endpoints ({activeDesign.design.api_endpoints.length})
-            </h4>
-            <div className="grid gap-2 sm:grid-cols-2">
-              {activeDesign.design.api_endpoints.map((endpoint, i) => {
-                const match = endpoint.match(/^([A-Z]+)\s+(.+)$/);
-                const method = match ? match[1] : "GET";
-                const path = match ? match[2] : endpoint;
-                
-                let badgeColor = "bg-sky-500/10 text-sky-400 border-sky-500/20";
-                if (method === "POST") badgeColor = "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
-                if (method === "PUT" || method === "PATCH") badgeColor = "bg-amber-500/10 text-amber-400 border-amber-500/20";
-                if (method === "DELETE") badgeColor = "bg-rose-500/10 text-rose-400 border-rose-500/20";
-                
-                return (
-                  <div
-                    key={i}
-                    className="bg-slate-900/30 border border-white/5 rounded-xl p-3 flex items-center gap-3 font-mono text-[11px] hover:border-white/10 transition"
-                  >
-                    <span className={`px-2 py-0.5 rounded border text-[9px] font-bold ${badgeColor}`}>{method}</span>
-                    <span className="text-slate-300 truncate select-all">{path}</span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* Frontend Architecture Section */}
-        {activeDesign.design?.frontend_design && (
-          <div className="space-y-6 pt-6 border-t border-white/10">
-            <div>
-              <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
-                <svg className="w-4 h-4 text-violet-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                </svg>
-                Frontend Architecture
-              </h3>
-              <p className="text-[11px] text-slate-500 mt-1">Client-side component hierarchy, state management, routes, and layout wireframes.</p>
-            </div>
-
-            {/* Component Tree Diagram */}
-            {activeDesign.design.frontend_design.component_tree_mermaid && (
+        {activeTab === "database" && (
+          <>
+            {/* ER Diagram Section */}
+            {activeDesign.design?.er_diagram_mermaid && (
               <div className="space-y-2.5">
-                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Component Hierarchy Diagram</h4>
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Entity Relationship Diagram</h4>
                 <div className="bg-slate-900/30 border border-white/5 rounded-2xl p-4 overflow-x-auto flex justify-center">
-                  <MermaidRenderer chart={activeDesign.design.frontend_design.component_tree_mermaid} />
+                  <MermaidRenderer chart={activeDesign.design.er_diagram_mermaid} />
                 </div>
               </div>
             )}
 
-            {/* State Management Strategy */}
-            {activeDesign.design.frontend_design.state_management && (
+            {/* Data Flow Diagram Section */}
+            {activeDesign.design?.dfd_mermaid && (
               <div className="space-y-2.5">
-                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">State Management Strategy</h4>
-                <div className="bg-slate-900/30 border border-white/5 rounded-2xl p-5 text-xs text-slate-300 leading-6 font-sans">
-                  {activeDesign.design.frontend_design.state_management}
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Data Flow Diagram (Level 1)</h4>
+                <div className="bg-slate-900/30 border border-white/5 rounded-2xl p-4 overflow-x-auto flex justify-center">
+                  <MermaidRenderer chart={activeDesign.design.dfd_mermaid} />
                 </div>
               </div>
             )}
 
-            {/* Routing Structure */}
-            {activeDesign.design.frontend_design.routing_structure && (
+            {/* Low-Level Component Diagram Section */}
+            {activeDesign.design?.component_mermaid && (
               <div className="space-y-2.5">
-                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Routing Structure</h4>
-                <pre className="text-xs text-slate-350 leading-5 whitespace-pre-wrap font-mono p-4 bg-slate-950/80 border border-white/5 rounded-2xl max-h-[250px] overflow-y-auto">
-                  {activeDesign.design.frontend_design.routing_structure}
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Low-Level Component Diagram</h4>
+                <div className="bg-slate-900/30 border border-white/5 rounded-2xl p-4 overflow-x-auto flex justify-center">
+                  <MermaidRenderer chart={activeDesign.design.component_mermaid} />
+                </div>
+              </div>
+            )}
+
+            {/* SQL DDL Code block */}
+            {activeDesign.design?.sql_ddl && (
+              <div className="space-y-2.5">
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">PostgreSQL DDL</h4>
+                <pre className="text-xs text-slate-350 leading-5 whitespace-pre-wrap font-mono p-4 bg-slate-950/80 border border-white/5 rounded-2xl max-h-[350px] overflow-y-auto select-all">
+                  {activeDesign.design.sql_ddl}
                 </pre>
               </div>
             )}
 
-            {/* Wireframe Descriptions */}
-            {activeDesign.design.frontend_design.wireframe_descriptions && activeDesign.design.frontend_design.wireframe_descriptions.length > 0 && (
+            {/* API Endpoints with badges */}
+            {activeDesign.design?.api_endpoints && activeDesign.design.api_endpoints.length > 0 && (
               <div className="space-y-2.5">
-                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Wireframe & Layout Descriptions</h4>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {activeDesign.design.frontend_design.wireframe_descriptions.map((wf, idx) => (
-                    <div key={idx} className="bg-slate-900/30 border border-white/5 rounded-2xl p-4 hover:border-white/10 transition flex flex-col gap-1.5">
-                      <h5 className="text-xs font-bold text-slate-200 flex items-center gap-1.5 border-b border-white/5 pb-2">
-                        <span className="w-1.5 h-1.5 bg-violet-400 rounded-full" />
-                        {wf.view_name}
-                      </h5>
-                      <p className="text-[11px] text-slate-400 leading-5 whitespace-pre-line flex-1">{wf.layout_description}</p>
-                    </div>
-                  ))}
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                  API Endpoints ({activeDesign.design.api_endpoints.length})
+                </h4>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {activeDesign.design.api_endpoints.map((endpoint, i) => {
+                    const match = endpoint.match(/^([A-Z]+)\s+(.+)$/);
+                    const method = match ? match[1] : "GET";
+                    const path = match ? match[2] : endpoint;
+                    
+                    let badgeColor = "bg-sky-500/10 text-sky-400 border-sky-500/20";
+                    if (method === "POST") badgeColor = "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
+                    if (method === "PUT" || method === "PATCH") badgeColor = "bg-amber-500/10 text-amber-400 border-amber-500/20";
+                    if (method === "DELETE") badgeColor = "bg-rose-500/10 text-rose-400 border-rose-500/20";
+                    
+                    return (
+                      <div
+                        key={i}
+                        className="bg-slate-900/30 border border-white/5 rounded-xl p-3 flex items-center gap-3 font-mono text-[11px] hover:border-white/10 transition"
+                      >
+                        <span className={`px-2 py-0.5 rounded border text-[9px] font-bold ${badgeColor}`}>{method}</span>
+                        <span className="text-slate-300 truncate select-all">{path}</span>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
-          </div>
+          </>
+        )}
+
+        {activeTab === "frontend" && (
+          <>
+            {activeDesign.design?.frontend_design && (Object.keys(activeDesign.design.frontend_design).length > 0) ? (
+              <div className="space-y-6">
+                {/* Component Tree Diagram */}
+                {activeDesign.design.frontend_design.component_tree_mermaid && (
+                  <div className="space-y-2.5">
+                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Component Hierarchy Diagram</h4>
+                    <div className="bg-slate-900/30 border border-white/5 rounded-2xl p-4 overflow-x-auto flex justify-center">
+                      <MermaidRenderer chart={activeDesign.design.frontend_design.component_tree_mermaid} />
+                    </div>
+                  </div>
+                )}
+
+                {/* State Management Strategy */}
+                {activeDesign.design.frontend_design.state_management && (
+                  <div className="space-y-2.5">
+                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">State Management Strategy</h4>
+                    <pre className="text-xs text-slate-350 leading-5 whitespace-pre-wrap font-mono p-4 bg-slate-950/80 border border-white/5 rounded-2xl max-h-[300px] overflow-y-auto">
+                      {typeof activeDesign.design.frontend_design.state_management === "object"
+                        ? JSON.stringify(activeDesign.design.frontend_design.state_management, null, 2)
+                        : activeDesign.design.frontend_design.state_management}
+                    </pre>
+                  </div>
+                )}
+
+                {/* Routing Structure */}
+                {activeDesign.design.frontend_design.routing_structure && (
+                  <div className="space-y-2.5">
+                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Routing Structure</h4>
+                    <pre className="text-xs text-slate-355 leading-5 whitespace-pre-wrap font-mono p-4 bg-slate-950/80 border border-white/5 rounded-2xl max-h-[250px] overflow-y-auto">
+                      {typeof activeDesign.design.frontend_design.routing_structure === "object"
+                        ? JSON.stringify(activeDesign.design.frontend_design.routing_structure, null, 2)
+                        : activeDesign.design.frontend_design.routing_structure}
+                    </pre>
+                  </div>
+                )}
+
+                {/* Wireframe Descriptions */}
+                {activeDesign.design.frontend_design.wireframe_descriptions && activeDesign.design.frontend_design.wireframe_descriptions.length > 0 && (
+                  <div className="space-y-2.5">
+                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Wireframe & Layout Descriptions</h4>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      {activeDesign.design.frontend_design.wireframe_descriptions.map((wf, idx) => (
+                        <div key={idx} className="bg-slate-900/30 border border-white/5 rounded-2xl p-4 hover:border-white/10 transition flex flex-col gap-1.5">
+                          <h5 className="text-xs font-bold text-slate-200 flex items-center gap-1.5 border-b border-white/5 pb-2">
+                            <span className="w-1.5 h-1.5 bg-violet-400 rounded-full" />
+                            {wf.view_name}
+                          </h5>
+                          <p className="text-[11px] text-slate-400 leading-5 whitespace-pre-line flex-1">{wf.layout_description}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-10 border border-dashed border-white/10 rounded-2xl">
+                <p className="text-sm text-slate-400">No frontend design is available for this module.</p>
+              </div>
+            )}
+          </>
+        )}
+
+        {activeTab === "testing" && (
+          <>
+            {activeDesign.design?.test_strategy && (Object.keys(activeDesign.design.test_strategy).length > 0) ? (
+              <div className="space-y-6">
+                {/* BDD Gherkin Scenarios */}
+                {activeDesign.design.test_strategy.bdd_scenarios && (
+                  <div className="space-y-2.5">
+                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">BDD Gherkin Scenarios</h4>
+                    <pre className="text-xs text-slate-350 leading-5 whitespace-pre-wrap font-mono p-4 bg-slate-950/80 border border-white/5 rounded-2xl max-h-[300px] overflow-y-auto">
+                      {typeof activeDesign.design.test_strategy.bdd_scenarios === "object"
+                        ? JSON.stringify(activeDesign.design.test_strategy.bdd_scenarios, null, 2)
+                        : activeDesign.design.test_strategy.bdd_scenarios}
+                    </pre>
+                  </div>
+                )}
+
+                {/* Test Pyramid Plan */}
+                {activeDesign.design.test_strategy.test_pyramid && (
+                  <div className="space-y-2.5">
+                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Test Pyramid Plan</h4>
+                    <div className="bg-slate-900/30 border border-white/5 rounded-2xl p-5 text-xs text-slate-300 leading-6 font-sans whitespace-pre-line">
+                      {typeof activeDesign.design.test_strategy.test_pyramid === "object"
+                        ? JSON.stringify(activeDesign.design.test_strategy.test_pyramid, null, 2)
+                        : activeDesign.design.test_strategy.test_pyramid}
+                    </div>
+                  </div>
+                )}
+
+                {/* Load Testing Strategy */}
+                {activeDesign.design.test_strategy.load_testing && (
+                  <div className="space-y-2.5">
+                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Load Testing Strategy</h4>
+                    <pre className="text-xs text-slate-350 leading-5 whitespace-pre-wrap font-mono p-4 bg-slate-950/80 border border-white/5 rounded-2xl max-h-[300px] overflow-y-auto">
+                      {typeof activeDesign.design.test_strategy.load_testing === "object"
+                        ? JSON.stringify(activeDesign.design.test_strategy.load_testing, null, 2)
+                        : activeDesign.design.test_strategy.load_testing}
+                    </pre>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-10 border border-dashed border-white/10 rounded-2xl">
+                <p className="text-sm text-slate-400">No QA test strategy is available for this module.</p>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
