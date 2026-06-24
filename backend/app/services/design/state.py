@@ -22,6 +22,8 @@ class GraphState(TypedDict):
 
     api_design:      Dict[str, Any]        # JSON output from API agent
     lld_design:      Dict[str, Any]        # JSON output containing LLD/DFD diagrams
+    frontend_design: Dict[str, Any]        # JSON output containing frontend architecture design
+    test_strategy:   Dict[str, Any]        # JSON output containing BDD, Test Pyramid, Load testing
 
     # accumulator
     domain_designs:  List[Dict[str, Any]]  # finished per-module designs
@@ -50,6 +52,8 @@ class ModuleGraphState(TypedDict):
 
     api_design:      Dict[str, Any]        # JSON output from API agent
     lld_design:      Dict[str, Any]        # JSON output containing LLD/DFD diagrams
+    frontend_design: Dict[str, Any]        # JSON output containing frontend architecture design
+    test_strategy:   Dict[str, Any]        # JSON output containing BDD, Test Pyramid, Load testing
 
     # output
     module_design:   Optional[Dict[str, Any]]  # final design for this module

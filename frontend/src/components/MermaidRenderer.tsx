@@ -142,13 +142,173 @@ function parseAttributeLine(line: string): string {
   return `    ${baseType} ${name}${keyStr}${commentStr}`;
 }
 
+interface IconMapItem {
+  keywords: string[];
+  url: string;
+  invert?: boolean;
+}
+
+const ICON_MAPPING: IconMapItem[] = [
+  // Frameworks & Libraries
+  { keywords: ["next.js", "nextjs"], url: "https://skillicons.dev/icons?i=nextjs" },
+  { keywords: ["react"], url: "https://skillicons.dev/icons?i=react" },
+  { keywords: ["vue"], url: "https://skillicons.dev/icons?i=vue" },
+  { keywords: ["angular"], url: "https://skillicons.dev/icons?i=angular" },
+  { keywords: ["svelte"], url: "https://skillicons.dev/icons?i=svelte" },
+  { keywords: ["fastapi"], url: "https://skillicons.dev/icons?i=fastapi" },
+  { keywords: ["django"], url: "https://skillicons.dev/icons?i=django" },
+  { keywords: ["flask"], url: "https://skillicons.dev/icons?i=flask" },
+  { keywords: ["express"], url: "https://skillicons.dev/icons?i=express" },
+  { keywords: ["nestjs", "nest.js"], url: "https://skillicons.dev/icons?i=nest" },
+  { keywords: ["spring boot", "spring framework", "spring"], url: "https://skillicons.dev/icons?i=spring" },
+  { keywords: ["laravel"], url: "https://skillicons.dev/icons?i=laravel" },
+  { keywords: ["flutter"], url: "https://skillicons.dev/icons?i=flutter" },
+
+  // Databases & Caches
+  { keywords: ["postgresql", "postgres"], url: "https://skillicons.dev/icons?i=postgres" },
+  { keywords: ["redis"], url: "https://skillicons.dev/icons?i=redis" },
+  { keywords: ["mysql"], url: "https://skillicons.dev/icons?i=mysql" },
+  { keywords: ["mongodb", "mongo"], url: "https://skillicons.dev/icons?i=mongodb" },
+  { keywords: ["sqlite"], url: "https://skillicons.dev/icons?i=sqlite" },
+  { keywords: ["cassandra"], url: "https://skillicons.dev/icons?i=cassandra" },
+  { keywords: ["dynamodb"], url: "https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/amazondynamodb.svg", invert: true },
+  { keywords: ["elasticsearch", "opensearch"], url: "https://skillicons.dev/icons?i=elasticsearch" },
+  { keywords: ["supabase"], url: "https://skillicons.dev/icons?i=supabase" },
+  { keywords: ["firebase"], url: "https://skillicons.dev/icons?i=firebase" },
+  { keywords: ["prisma"], url: "https://skillicons.dev/icons?i=prisma" },
+
+  // Languages & Runtimes
+  { keywords: ["nodejs", "node.js", "node run"], url: "https://skillicons.dev/icons?i=nodejs" },
+  { keywords: ["python"], url: "https://skillicons.dev/icons?i=python" },
+  { keywords: ["golang", "go lang"], url: "https://skillicons.dev/icons?i=go" },
+  { keywords: ["rust"], url: "https://skillicons.dev/icons?i=rust" },
+  { keywords: ["java "], url: "https://skillicons.dev/icons?i=java" },
+  { keywords: ["typescript", "ts"], url: "https://skillicons.dev/icons?i=ts" },
+  { keywords: ["javascript", "js"], url: "https://skillicons.dev/icons?i=js" },
+  { keywords: ["cpp", "c++"], url: "https://skillicons.dev/icons?i=cpp" },
+  { keywords: ["ruby"], url: "https://skillicons.dev/icons?i=ruby" },
+  { keywords: ["php"], url: "https://skillicons.dev/icons?i=php" },
+  { keywords: ["elixir"], url: "https://skillicons.dev/icons?i=elixir" },
+  { keywords: ["swift"], url: "https://skillicons.dev/icons?i=swift" },
+  { keywords: ["kotlin"], url: "https://skillicons.dev/icons?i=kotlin" },
+
+  // DevOps & Server
+  { keywords: ["docker"], url: "https://skillicons.dev/icons?i=docker" },
+  { keywords: ["kubernetes", "k8s", "eks", "gke", "aks"], url: "https://skillicons.dev/icons?i=kubernetes" },
+  { keywords: ["terraform"], url: "https://skillicons.dev/icons?i=terraform" },
+  { keywords: ["ansible"], url: "https://skillicons.dev/icons?i=ansible" },
+  { keywords: ["nginx"], url: "https://skillicons.dev/icons?i=nginx" },
+  { keywords: ["apache kafka", "kafka"], url: "https://skillicons.dev/icons?i=kafka" },
+  { keywords: ["rabbitmq"], url: "https://skillicons.dev/icons?i=rabbitmq" },
+  { keywords: ["prometheus"], url: "https://skillicons.dev/icons?i=prometheus" },
+  { keywords: ["grafana"], url: "https://skillicons.dev/icons?i=grafana" },
+  { keywords: ["github actions", "github-actions"], url: "https://skillicons.dev/icons?i=githubactions" },
+  { keywords: ["jenkins"], url: "https://skillicons.dev/icons?i=jenkins" },
+  { keywords: ["gitlab"], url: "https://skillicons.dev/icons?i=gitlab" },
+
+  // Cloud Platforms
+  { keywords: ["cloudflare"], url: "https://skillicons.dev/icons?i=cloudflare" },
+  { keywords: ["vercel"], url: "https://skillicons.dev/icons?i=vercel" },
+  { keywords: ["netlify"], url: "https://skillicons.dev/icons?i=netlify" },
+  { keywords: ["heroku"], url: "https://skillicons.dev/icons?i=heroku" },
+  { keywords: ["digitalocean", "digital ocean"], url: "https://skillicons.dev/icons?i=digitalocean" },
+
+  // AWS Specific Services
+  { keywords: ["lambda"], url: "https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/awslambda.svg", invert: true },
+  { keywords: ["s3", "simple storage"], url: "https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/amazons3.svg", invert: true },
+  { keywords: ["rds", "relational database"], url: "https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/amazonrds.svg", invert: true },
+  { keywords: ["sqs", "simple queue"], url: "https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/amazonsqs.svg", invert: true },
+  { keywords: ["sns", "simple notification"], url: "https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/amazonsns.svg", invert: true },
+  { keywords: ["cloudfront"], url: "https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/amazoncloudfront.svg", invert: true },
+  { keywords: ["api gateway", "apigateway"], url: "https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/amazonapigateway.svg", invert: true },
+  { keywords: ["route 53", "route53"], url: "https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/amazonroute53.svg", invert: true },
+  { keywords: ["cognito"], url: "https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/amazoncognito.svg", invert: true },
+  { keywords: ["ecs", "elastic container service"], url: "https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/amazonecs.svg", invert: true },
+  { keywords: ["ec2", "elastic compute cloud"], url: "https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/amazonec2.svg", invert: true },
+  { keywords: ["waf", "web application firewall"], url: "https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/amazoneks.svg", invert: true },
+  { keywords: ["aws", "amazon"], url: "https://skillicons.dev/icons?i=aws" },
+
+  // GCP / Google Cloud
+  { keywords: ["google cloud platform", "google cloud", "gcp"], url: "https://skillicons.dev/icons?i=gcp" },
+
+  // Azure
+  { keywords: ["azure"], url: "https://skillicons.dev/icons?i=azure" },
+
+  // AI & ML
+  { keywords: ["openai", "chatgpt"], url: "https://skillicons.dev/icons?i=openai" },
+  { keywords: ["hugging face", "huggingface"], url: "https://skillicons.dev/icons?i=huggingface" },
+  { keywords: ["pytorch"], url: "https://skillicons.dev/icons?i=pytorch" },
+  { keywords: ["tensorflow"], url: "https://skillicons.dev/icons?i=tensorflow" },
+];
+
+function getIconForTech(techName: string): IconMapItem | null {
+  const normalized = techName.toLowerCase();
+  
+  for (const item of ICON_MAPPING) {
+    for (const keyword of item.keywords) {
+      if (keyword.length <= 4) {
+        const regex = new RegExp(`\\b${keyword.replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&")}\\b`, "i");
+        if (regex.test(normalized)) {
+          return item;
+        }
+      } else {
+        if (normalized.includes(keyword)) {
+          return item;
+        }
+      }
+    }
+  }
+  return null;
+}
+
+function injectTechnologyIcons(chart: string): string {
+  if (!chart) return "";
+
+  const trimmed = chart.trim();
+  const isFlowchart = /^(?:%%\s*.*\n)*\s*(graph|flowchart)\b/i.test(trimmed);
+  if (!isFlowchart) {
+    return chart;
+  }
+
+  const RESERVED_KEYWORDS = new Set([
+    "graph", "flowchart", "subgraph", "end", "direction", 
+    "style", "classdef", "class", "linkstyle", "click",
+    "statediagram", "statediagram-v2", "erdiagram", "classdiagram",
+    "sequencediagram", "gantt", "pie", "journey", "info", "requirementdiagram",
+    "tb", "td", "bt", "rl", "lr"
+  ]);
+
+  const nodeRegex = /\b([a-zA-Z0-9_-]+)\s*(?:(\(\[|\[\(|\[\[|\(\(|\{\{|\[\/|\[\\|\[|\(|\{|\>))\s*("?)(.*?)\3\s*(?:(\]\)|\)\]|\]\]|\)\)|\}\}|\/\]|\\\]|\]|\)|\}))/g;
+
+  return chart.replace(nodeRegex, (match, nodeId, openBrackets, quote, labelText, closeBrackets) => {
+    if (RESERVED_KEYWORDS.has(nodeId.toLowerCase())) {
+      return match;
+    }
+
+    const iconInfo = getIconForTech(labelText);
+    if (iconInfo) {
+      if (labelText.includes("<img")) {
+        return match;
+      }
+      
+      const filterStyle = iconInfo.invert ? "filter: invert(1) brightness(2);" : "";
+      const imgTag = `<img src='${iconInfo.url}' width='20' height='20' style='vertical-align: middle; margin-right: 6px; display: inline-block; ${filterStyle}'/>`;
+      
+      return `${nodeId}${openBrackets}"${imgTag}${labelText.replace(/"/g, "'")}"${closeBrackets}`;
+    }
+
+    // Always wrap node label in double quotes to prevent syntax errors due to special characters/spaces
+    return `${nodeId}${openBrackets}"${labelText.replace(/"/g, "'")}"${closeBrackets}`;
+  });
+}
+
 function preprocessMermaidChart(chart: string): string {
   if (!chart || typeof chart !== "string") return "";
 
-  let processed = chart.trim();
+  let processed = injectTechnologyIcons(chart.trim());
 
   if (!processed.includes("erDiagram")) {
-    return chart;
+    return processed;
   }
 
   // Pre-sanitize reserved keywords (like CLASS) in the frontend chart string

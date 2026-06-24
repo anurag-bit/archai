@@ -122,8 +122,11 @@ async def extract_modules(normalized_text: str, constraints: str = "") -> List[s
         prompt += (
             f"CRITICAL ARCHITECTURAL CONSTRAINTS TO CONSIDER:\n{constraints}\n\n"
             "If the constraints mention authentication, authorization, RBAC, roles, or SSO, "
-            "you MUST include a module named 'User & Access Management' to centralize users and roles. "
-            "Do not force other modules to handle user identity.\n\n"
+            "you MUST ensure there is exactly one centralized module for user identity and access control (e.g., users, roles, sessions). "
+            "If the SRS outline already contains an identity/auth/user-focused module (e.g., 'Identity Module', 'Auth Module', 'User Management', or similar), "
+            "use or consolidate into that module. "
+            "Only if no such module is present in the outline should you add a new module named 'User & Access Management'. "
+            "Do NOT output duplicate or overlapping user identity modules.\n\n"
         )
 
     prompt += f"Document Outline:\n{outline}"

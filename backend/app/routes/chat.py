@@ -4,7 +4,7 @@ import traceback
 from fastapi import APIRouter, HTTPException
 from schemas.chat import ChatRequest
 from services.vector_store import similarity_search_with_score
-from langchain_openai import ChatOpenAI
+from services.design.helpers import get_chat_model
 from langchain_core.prompts import ChatPromptTemplate
 from core.config import OPENAI_MODEL
 
@@ -37,19 +37,16 @@ async def chat_endpoint(req: ChatRequest):
             context_parts.append(f"[Document {idx + 1} - {source}]\n{doc.page_content}")
         context = "\n\n".join(context_parts)
 
-        # Initialize OpenAI Chat Model
-        model = ChatOpenAI(
-            model=OPENAI_MODEL,
-            temperature=req.temperature,
-            openai_api_key=api_key,
-            request_timeout=60
-        )
+        # Initialize Chat Model (primary or fallback)
+        model = get_chat_model(temperature=req.temperature)
 
         chain = CHAT_RESPONSE_PROMPT_TEMPLATE | model
         response = await chain.ainvoke({
             "context": context,
             "question": req.question
         })
+
+        actual_model = response.response_metadata.get("model_name", OPENAI_MODEL)
 
         return {
             "answer": response.content,
@@ -60,7 +57,7 @@ async def chat_endpoint(req: ChatRequest):
                 }
                 for doc in retrieved_docs
             ],
-            "model": OPENAI_MODEL
+            "model": actual_model
         }
     except Exception as e:
         request_id = str(uuid.uuid4())

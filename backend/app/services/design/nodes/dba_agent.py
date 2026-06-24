@@ -1,7 +1,8 @@
 import json
 from typing import List, Dict, Any
 from langchain_core.messages import HumanMessage, SystemMessage
-from services.design.helpers import get_chat_model, parse_llm_json
+from services.design.helpers import get_chat_model, parse_llm_json, invoke_with_retry_and_validation
+from services.design.validators import validate_dba_draft
 from services.design.state import GraphState
 
 _DBA_SYSTEM = (
@@ -25,6 +26,7 @@ You are designing the "{MODULE_NAME}" module.
    - If the SRS describes a workflow, create a table to track its state.
    - If the SRS describes a sub-entity (e.g., "follow-up actions", "documents", "siblings"), create a table for it.
 6. SRS MAPPING — Ensure EVERY feature, capability, and workflow described in the SRS context is represented as a table, column, or enum. If a capability is missing, the QA agent will reject the draft.
+7. INDEXES — For any performance index required, you MUST output the explicit DDL string format: 'CREATE INDEX idx_table_column ON table_name(column_name)'. Do not just output the index name.
 
 {CONSTRAINTS}
 
@@ -59,7 +61,7 @@ When generating the "mermaid_er" string, you MUST follow these rules:
         "columns": [
           {{"name": "...", "type": "...", "constraints": "...", "justification": "..."}}
         ],
-        "indexes": ["idx_..."]
+        "indexes": ["CREATE INDEX idx_table_name_column_name ON table_name(column_name)"]
       }}
     ]
   }}
@@ -140,11 +142,14 @@ async def dba_agent_node(state: GraphState) -> dict:
         )
 
     model    = get_chat_model(temperature=0.05)
-    response = await model.ainvoke([
-        SystemMessage(content=system_message),
-        HumanMessage(content=user_prompt),
-    ])
-    new_draft = parse_llm_json(response.content)
+    new_draft = await invoke_with_retry_and_validation(
+        model=model,
+        messages=[
+            SystemMessage(content=system_message),
+            HumanMessage(content=user_prompt),
+        ],
+        validator=validate_dba_draft
+    )
 
     # ── PROGRAMMATIC MERGE — prevents whack-a-mole regressions ───────────────
     # If this is a retry, merge the patched tables into the old complete draft

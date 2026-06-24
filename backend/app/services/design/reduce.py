@@ -28,7 +28,7 @@ Design the comprehensive, production-grade architecture. You MUST output a detai
 Generate a Mermaid `graph TD` flowchart showing the complete request lifecycle AND inter-service communication.
 CRITICAL RULES FOR MERMAID:
 - DO NOT use generic labels. You MUST use the technologies specified in the Tech Stack ({TECH_STACK}) to label the nodes (e.g., `Client[Next.js Frontend]`, `Service[Golang Microservice]`).
-- **SECURITY PERIMETER:** You MUST include a Web Application Firewall (WAF) and an API Gateway node. 
+- **SECURITY PERIMETER:** You MUST include a Web Application Firewall ({WAF_NAME}) and an API Gateway node. 
 - **AUTH FLOW:** Show the API Gateway validating JWTs against an Auth Service before routing to internal modules.
 - Map out the specific modules generated in Phase 1 as separate nodes.
 - Use solid lines (`-->`) for synchronous calls and dashed lines (`-.->`) for asynchronous/event-driven communication (Queue).
@@ -37,13 +37,13 @@ CRITICAL RULES FOR MERMAID:
 Generate a Mermaid `graph TD` flowchart specifically mapping the Network Topology.
 CRITICAL RULES FOR MERMAID:
 - Use `subgraph` to clearly define network boundaries.
-- Create a `subgraph "Cloud Provider VPC"` containing all resources.
-- Inside the VPC, create `subgraph "Public Subnets"` and `subgraph "Private Subnets"`.
-- **Public Subnet:** Must contain the Load Balancer (ALB/NLB) and NAT Gateway.
-- **Private Subnet:** Must contain the Application Nodes (EKS/GKE worker nodes), the Database (PostgreSQL), and the Cache/Queue (Redis/SQS).
-- Show traffic flow: `Internet --> IGW --> ALB --> Private Subnet Nodes`.
-- Show egress flow: `Private Subnet Nodes --> NAT Gateway --> IGW --> Internet`.
-- Label nodes with specific tech (e.g., `ALB[AWS Application Load Balancer]`).
+- Create a `subgraph "{VPC_NAME}"` containing all resources.
+- Inside the network subnet structure, create `subgraph "Public Subnets"` and `subgraph "Private Subnets"`.
+- **Public Subnet:** Must contain the {LB_NAME} and {NAT_NAME}.
+- **Private Subnet:** Must contain the Application Nodes ({COMPUTE_LABEL}), the Database (PostgreSQL), and the Cache/Queue (Redis/SQS).
+- Show traffic flow: `Internet --> {IGW_NAME} --> {FLOW_LB} --> Private Subnet Nodes`.
+- Show egress flow: `Private Subnet Nodes --> {NAT_NAME} --> {IGW_NAME} --> Internet`.
+- Label nodes with specific tech (e.g., `{LB_LABEL}`).
 
 #### 3. Network Configuration & Routing
 - **VPC & Subnets:** Specify the IP range strategy (e.g., 10.0.0.0/16 VPC, 10.0.1.0/24 Public, 10.0.2.0/24 Private).
@@ -66,7 +66,7 @@ CRITICAL RULES FOR MERMAID:
 
 #### 7. Security & Compliance Architecture (CRITICAL)
 You MUST explicitly address how the system enforces the user's specific security protocols: {SECURITY_PROTOCOLS}.
-- **Network Security:** WAF rules (SQLi, XSS), DDoS protection (AWS Shield).
+- **Network Security:** WAF rules (SQLi, XSS), DDoS protection ({SHIELD_NAME}).
 - **Application Security:** Rate Limiting (Redis-backed at API Gateway), Backend Only Abstraction.
 - **Identity & Access Management (IAM):** Detail the RBAC implementation. How are JWT tokens issued, validated, and scoped?
 - **Data Security:** Encryption at rest (KMS) and in transit (TLS 1.3). Column-level encryption for PII.
@@ -93,12 +93,188 @@ Provide a Markdown table mapping the STRIDE threat model to specific architectur
 - Discuss database migration strategies (e.g., Alembic zero-downtime migrations).
 """
 
-async def generate_terraform_code(architecture_markdown: str) -> str:
-    """Translate system architecture design into valid, runnable AWS Terraform main.tf code."""
+def detect_cloud_provider(tech_stack: str) -> str:
+    lower = tech_stack.lower() if tech_stack else ""
+    if "gcp" in lower or "google cloud" in lower:
+        return "gcp"
+    elif "azure" in lower or "microsoft azure" in lower:
+        return "azure"
+    else:
+        return "aws"  # Default fallback
+
+
+def get_cloud_specific_terms(provider: str) -> dict:
+    if provider == "gcp":
+        return {
+            "vpc": "Cloud Provider VPC Network (Google Cloud)",
+            "load_balancer": "Cloud Load Balancer",
+            "nat_gateway": "Cloud NAT Gateway",
+            "internet_gateway": "Cloud Router / Internet Gateway",
+            "compute_label": "Google Kubernetes Engine (GKE) worker nodes",
+            "lb_label": "GLB[GCP Cloud Load Balancer]",
+            "flow_lb": "GLB",
+            "shield": "Google Cloud Armor (DDoS Protection)",
+            "waf": "Cloud Armor"
+        }
+    elif provider == "azure":
+        return {
+            "vpc": "Cloud Provider Virtual Network (Azure VNet)",
+            "load_balancer": "Azure Application Gateway / Load Balancer",
+            "nat_gateway": "Azure NAT Gateway",
+            "internet_gateway": "Azure Edge Internet Access",
+            "compute_label": "Azure Kubernetes Service (AKS) agent nodes",
+            "lb_label": "ALB[Azure Application Gateway]",
+            "flow_lb": "ALB",
+            "shield": "Azure DDoS Protection Plan",
+            "waf": "Azure WAF"
+        }
+    else:
+        # Default: AWS
+        return {
+            "vpc": "Cloud Provider VPC (AWS VPC)",
+            "load_balancer": "Application Load Balancer (ALB)",
+            "nat_gateway": "NAT Gateway",
+            "internet_gateway": "Internet Gateway (IGW)",
+            "compute_label": "AWS EKS worker nodes",
+            "lb_label": "ALB[AWS Application Load Balancer]",
+            "flow_lb": "ALB",
+            "shield": "AWS Shield (DDoS Protection)",
+            "waf": "AWS WAF"
+        }
+
+
+def validate_and_format_terraform_code(hcl_content: str) -> str:
+    """
+    Validates and formats Terraform code using a sandboxed Docker container.
+    Returns:
+        - If valid: formatted HCL code
+        - If invalid: HCL code prepended with clear validation errors
+    """
+    import os
+    import uuid
+    import shutil
+    import subprocess
+    import json
+
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    tf_temp_dir = os.path.join(current_dir, ".tf_temp")
+    os.makedirs(tf_temp_dir, exist_ok=True)
+    
+    run_id = str(uuid.uuid4())
+    run_dir = os.path.join(tf_temp_dir, run_id)
+    os.makedirs(run_dir, exist_ok=True)
+    
+    main_tf_path = os.path.join(run_dir, "main.tf")
+    with open(main_tf_path, "w", encoding="utf-8") as f:
+        f.write(hcl_content)
+        
+    try:
+        # 1. Run terraform init
+        init_cmd = [
+            "docker", "run", "--rm",
+            "-v", f"{run_dir}:/workspace",
+            "-w", "/workspace",
+            "hashicorp/terraform:latest",
+            "init", "-backend=false"
+        ]
+        init_res = subprocess.run(init_cmd, capture_output=True, text=True, timeout=60)
+        
+        # 2. Run terraform fmt -check
+        fmt_check_cmd = [
+            "docker", "run", "--rm",
+            "-v", f"{run_dir}:/workspace",
+            "-w", "/workspace",
+            "hashicorp/terraform:latest",
+            "fmt", "-check"
+        ]
+        fmt_check_res = subprocess.run(fmt_check_cmd, capture_output=True, text=True, timeout=30)
+        
+        if fmt_check_res.returncode != 0:
+            # Code is not formatted correctly, let's run terraform fmt to auto-format it!
+            fmt_cmd = [
+                "docker", "run", "--rm",
+                "-v", f"{run_dir}:/workspace",
+                "-w", "/workspace",
+                "hashicorp/terraform:latest",
+                "fmt"
+            ]
+            subprocess.run(fmt_cmd, capture_output=True, text=True, timeout=30)
+            
+        # Read the formatted (or original if fmt failed) HCL content back
+        with open(main_tf_path, "r", encoding="utf-8") as f:
+            formatted_content = f.read()
+            
+        # 3. Run terraform validate -json
+        validate_cmd = [
+            "docker", "run", "--rm",
+            "-v", f"{run_dir}:/workspace",
+            "-w", "/workspace",
+            "hashicorp/terraform:latest",
+            "validate", "-json"
+        ]
+        validate_res = subprocess.run(validate_cmd, capture_output=True, text=True, timeout=30)
+        
+        # Parse the validation JSON output
+        try:
+            val_data = json.loads(validate_res.stdout.strip())
+            is_valid = val_data.get("valid", False)
+            diagnostics = val_data.get("diagnostics", [])
+        except Exception:
+            is_valid = (validate_res.returncode == 0)
+            diagnostics = []
+            
+        if not is_valid:
+            error_msgs = []
+            if diagnostics:
+                for diag in diagnostics:
+                    severity = diag.get("severity", "error").upper()
+                    summary = diag.get("summary", "Unknown Error")
+                    detail = diag.get("detail", "")
+                    line_num = diag.get("range", {}).get("start", {}).get("line", "?")
+                    error_msgs.append(f"- [{severity}] Line {line_num}: {summary}\n  Details: {detail}")
+            else:
+                stderr_clean = validate_res.stderr.strip() or validate_res.stdout.strip()
+                if stderr_clean:
+                    error_msgs.append(stderr_clean)
+                else:
+                    error_msgs.append("Unknown validation failure.")
+                    
+            errors_str = "\n".join(error_msgs)
+            
+            warning_banner = (
+                "/*\n"
+                "========================================================================\n"
+                "⚠️ WARNING: TERRAFORM VALIDATION FAILED!\n"
+                "========================================================================\n"
+                "The generated HCL code contains syntax or semantic errors.\n"
+                "Please review the errors below:\n\n"
+                f"{errors_str}\n"
+                "========================================================================\n"
+                "*/\n\n"
+            )
+            return warning_banner + formatted_content
+            
+        return formatted_content
+        
+    except subprocess.TimeoutExpired as te:
+        return f"/*\n⚠️ Validation Timeout: Terraform validation timed out ({te.timeout}s).\n*/\n\n" + hcl_content
+    except Exception as e:
+        return f"/*\n⚠️ Validation Helper Error: Failed to run validation ({str(e)}).\n*/\n\n" + hcl_content
+    finally:
+        # Clean up temporary run directory
+        try:
+            shutil.rmtree(run_dir)
+        except Exception:
+            pass
+
+
+async def generate_terraform_code(architecture_markdown: str, provider: str = "aws") -> str:
+    """Translate system architecture design into valid, runnable Terraform main.tf code for the target provider."""
+    import asyncio
     model = get_chat_model(temperature=0.1)
     prompt = (
         "You are an expert Cloud Infrastructure Engineer and Terraform specialist.\n"
-        "Convert this architecture into a valid Terraform main.tf file using AWS provider modules.\n"
+        f"Convert this architecture into a valid Terraform main.tf file using {provider.upper()} provider modules.\n"
         "Output ONLY valid Terraform HCL code. Do NOT wrap it in any explanations.\n\n"
         f"### ARCHITECTURE SPECIFICATION:\n{architecture_markdown}"
     )
@@ -110,7 +286,10 @@ async def generate_terraform_code(architecture_markdown: str) -> str:
     if content.startswith("```"):
         content = re.sub(r"^```[a-zA-Z]*\n", "", content)
         content = re.sub(r"\n```$", "", content)
-    return content.strip()
+    
+    hcl_content = content.strip()
+    validated_content = await asyncio.to_thread(validate_and_format_terraform_code, hcl_content)
+    return validated_content
 
 async def generate_openapi_spec(domain_designs: List[Dict[str, Any]]) -> str:
     """Generate a single valid OpenAPI 3.0.0 YAML specification combining all modules' API endpoints."""
@@ -173,20 +352,32 @@ async def generate_global_architecture(
         else:
             parts.append(f"- {module}: {len(design.get('api_endpoints', []))} endpoints")
 
+    provider = detect_cloud_provider(tech_stack)
+    terms = get_cloud_specific_terms(provider)
+
     model = get_chat_model(temperature=0.2)
     response = await model.ainvoke([
         SystemMessage(content=_ARCHITECT_SYSTEM),
         HumanMessage(content=_ARCHITECT_PROMPT.format(
             MODULE_COUNT=len(domain_designs),
             MODULE_SUMMARIES="\n".join(parts),
-            TECH_STACK=tech_stack or "Standard modern stack (Python, PostgreSQL, Redis)",
+            TECH_STACK=tech_stack or f"Standard modern stack (Python, PostgreSQL, Redis) running on {provider.upper()}",
             DESIGN_PRINCIPLES=design_principles or "Standard microservices/domain-driven design",
-            SECURITY_PROTOCOLS=security_protocols or "Standard security protocols (TLS, RBAC, Encryption at Rest)"
+            SECURITY_PROTOCOLS=security_protocols or "Standard security protocols (TLS, RBAC, Encryption at Rest)",
+            VPC_NAME=terms["vpc"],
+            LB_NAME=terms["load_balancer"],
+            NAT_NAME=terms["nat_gateway"],
+            IGW_NAME=terms["internet_gateway"],
+            COMPUTE_LABEL=terms["compute_label"],
+            LB_LABEL=terms["lb_label"],
+            FLOW_LB=terms["flow_lb"],
+            SHIELD_NAME=terms["shield"],
+            WAF_NAME=terms["waf"]
         )),
     ])
     
     arch_markdown = response.content.strip()
-    terraform_code = await generate_terraform_code(arch_markdown)
+    terraform_code = await generate_terraform_code(arch_markdown, provider)
     openapi_spec = await generate_openapi_spec(domain_designs)
     
     return {

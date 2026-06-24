@@ -10,6 +10,15 @@ type DomainDesign = {
     api_endpoints?: string[];
     dfd_mermaid?: string;
     component_mermaid?: string;
+    frontend_design?: {
+      component_tree_mermaid: string;
+      state_management: string;
+      routing_structure: string;
+      wireframe_descriptions: Array<{
+        view_name: string;
+        layout_description: string;
+      }>;
+    };
     raw_json?: any;
   };
   error?: string;
@@ -289,6 +298,25 @@ export function ModuleSpec({
       if (activeDesign.design?.component_mermaid) {
         content += `\n\n## Low-Level Component Diagram\n\`\`\`mermaid\n${activeDesign.design.component_mermaid}\n\`\`\``;
       }
+      if (activeDesign.design?.frontend_design) {
+        const fd = activeDesign.design.frontend_design;
+        content += `\n\n## Frontend Architecture`;
+        if (fd.component_tree_mermaid) {
+          content += `\n\n### Component Hierarchy Diagram\n\`\`\`mermaid\n${fd.component_tree_mermaid}\n\`\`\``;
+        }
+        if (fd.state_management) {
+          content += `\n\n### State Management\n${fd.state_management}`;
+        }
+        if (fd.routing_structure) {
+          content += `\n\n### Routing Structure\n${fd.routing_structure}`;
+        }
+        if (fd.wireframe_descriptions && fd.wireframe_descriptions.length > 0) {
+          content += `\n\n### Wireframes\n`;
+          fd.wireframe_descriptions.forEach(wf => {
+            content += `#### ${wf.view_name}\n${wf.layout_description}\n\n`;
+          });
+        }
+      }
       await navigator.clipboard.writeText(content);
     } catch (err) {
       console.error(err);
@@ -427,6 +455,69 @@ export function ModuleSpec({
                 );
               })}
             </div>
+          </div>
+        )}
+
+        {/* Frontend Architecture Section */}
+        {activeDesign.design?.frontend_design && (
+          <div className="space-y-6 pt-6 border-t border-white/10">
+            <div>
+              <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                <svg className="w-4 h-4 text-violet-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+                Frontend Architecture
+              </h3>
+              <p className="text-[11px] text-slate-500 mt-1">Client-side component hierarchy, state management, routes, and layout wireframes.</p>
+            </div>
+
+            {/* Component Tree Diagram */}
+            {activeDesign.design.frontend_design.component_tree_mermaid && (
+              <div className="space-y-2.5">
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Component Hierarchy Diagram</h4>
+                <div className="bg-slate-900/30 border border-white/5 rounded-2xl p-4 overflow-x-auto flex justify-center">
+                  <MermaidRenderer chart={activeDesign.design.frontend_design.component_tree_mermaid} />
+                </div>
+              </div>
+            )}
+
+            {/* State Management Strategy */}
+            {activeDesign.design.frontend_design.state_management && (
+              <div className="space-y-2.5">
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">State Management Strategy</h4>
+                <div className="bg-slate-900/30 border border-white/5 rounded-2xl p-5 text-xs text-slate-300 leading-6 font-sans">
+                  {activeDesign.design.frontend_design.state_management}
+                </div>
+              </div>
+            )}
+
+            {/* Routing Structure */}
+            {activeDesign.design.frontend_design.routing_structure && (
+              <div className="space-y-2.5">
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Routing Structure</h4>
+                <pre className="text-xs text-slate-350 leading-5 whitespace-pre-wrap font-mono p-4 bg-slate-950/80 border border-white/5 rounded-2xl max-h-[250px] overflow-y-auto">
+                  {activeDesign.design.frontend_design.routing_structure}
+                </pre>
+              </div>
+            )}
+
+            {/* Wireframe Descriptions */}
+            {activeDesign.design.frontend_design.wireframe_descriptions && activeDesign.design.frontend_design.wireframe_descriptions.length > 0 && (
+              <div className="space-y-2.5">
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Wireframe & Layout Descriptions</h4>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {activeDesign.design.frontend_design.wireframe_descriptions.map((wf, idx) => (
+                    <div key={idx} className="bg-slate-900/30 border border-white/5 rounded-2xl p-4 hover:border-white/10 transition flex flex-col gap-1.5">
+                      <h5 className="text-xs font-bold text-slate-200 flex items-center gap-1.5 border-b border-white/5 pb-2">
+                        <span className="w-1.5 h-1.5 bg-violet-400 rounded-full" />
+                        {wf.view_name}
+                      </h5>
+                      <p className="text-[11px] text-slate-400 leading-5 whitespace-pre-line flex-1">{wf.layout_description}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

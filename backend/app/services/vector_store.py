@@ -9,19 +9,25 @@ from langchain_core.documents import Document
 # Global cache variables
 _embeddings = None
 _chroma_client = None
+_lock = threading.Lock()
+_shutdown_event = threading.Event()
 
 def get_embeddings() -> LocalHuggingFaceEmbeddings:
     global _embeddings
     if _embeddings is None:
-        _embeddings = LocalHuggingFaceEmbeddings()
+        with _lock:
+            if _embeddings is None:
+                _embeddings = LocalHuggingFaceEmbeddings()
     return _embeddings
 
 def get_chroma_client() -> chromadb.HttpClient:
     global _chroma_client
     if _chroma_client is None:
-        host = os.getenv("CHROMA_HOST", "127.0.0.1")
-        port = int(os.getenv("CHROMA_PORT", "8000"))
-        _chroma_client = chromadb.HttpClient(host=host, port=port)
+        with _lock:
+            if _chroma_client is None:
+                host = os.getenv("CHROMA_HOST", "127.0.0.1")
+                port = int(os.getenv("CHROMA_PORT", "8000"))
+                _chroma_client = chromadb.HttpClient(host=host, port=port)
     return _chroma_client
 
 def get_collection():
@@ -186,17 +192,29 @@ def sweep_temporary_chunks() -> None:
     except Exception as e:
         print(f"Chroma temporary sweep skipped or failed: {e}")
 
+def stop_sweep_scheduler() -> None:
+    """
+    Triggers the shutdown event to stop the background sweep thread.
+    """
+    print("[vector_store] Stopping sweep scheduler...")
+    _shutdown_event.set()
+
 def start_sweep_scheduler(interval_seconds: int = 1800) -> None:
     """
     Starts a background daemon thread that sweeps temporary chunks periodically.
     """
+    _shutdown_event.clear()
+    
     def run_sweep():
-        while True:
-            time.sleep(interval_seconds)
+        print(f"[vector_store] Sweep scheduler started with interval {interval_seconds}s")
+        while not _shutdown_event.is_set():
+            if _shutdown_event.wait(timeout=interval_seconds):
+                break
             try:
                 sweep_temporary_chunks()
             except Exception as e:
                 print(f"Periodic sweep failed: {e}")
+        print("[vector_store] Sweep scheduler thread stopped.")
             
     thread = threading.Thread(target=run_sweep, daemon=True)
     thread.start()

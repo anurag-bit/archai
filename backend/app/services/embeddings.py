@@ -73,6 +73,8 @@ class LocalDeterministicEmbeddings(Embeddings):
     def embed_query(self, text: str) -> List[float]:
         return embed_text(text)
 
+logger = logging.getLogger(__name__)
+
 class LocalHuggingFaceEmbeddings(Embeddings):
     """
     Tries to load local HuggingFace embeddings (e.g. BAAI/bge-small-en-v1.5) via sentence-transformers,
@@ -80,6 +82,7 @@ class LocalHuggingFaceEmbeddings(Embeddings):
     """
     def __init__(self):
         self._underlying = None
+        self.degraded = False
 
     def _get_underlying(self) -> Embeddings:
         if self._underlying is None:
@@ -104,8 +107,13 @@ class LocalHuggingFaceEmbeddings(Embeddings):
                     model_kwargs=model_kwargs,
                     encode_kwargs={'normalize_embeddings': True}
                 )
+                self.degraded = False
             except Exception as e:
-                print(f"✓ Falling back to offline deterministic embeddings after failed load: {e}")
+                logger.warning(
+                    f"⚠️ EM-DEGRADED: Falling back to offline deterministic embeddings after failed load: {e}. "
+                    "This may severely impact retrieval/RAG quality!"
+                )
+                self.degraded = True
                 self._underlying = LocalDeterministicEmbeddings()
         return self._underlying
 

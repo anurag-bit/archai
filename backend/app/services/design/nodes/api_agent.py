@@ -1,6 +1,7 @@
 import json
 from langchain_core.messages import HumanMessage, SystemMessage
-from services.design.helpers import get_chat_model, parse_llm_json
+from services.design.helpers import get_chat_model, parse_llm_json, invoke_with_retry_and_validation
+from services.design.validators import validate_api_design
 from services.design.state import GraphState
 
 _API_SYSTEM = (
@@ -88,11 +89,14 @@ async def api_agent_node(state: GraphState) -> dict:
         CONSTRAINTS = constraints_block,
     )
     model    = get_chat_model(temperature=0.05)
-    response = await model.ainvoke([
-        SystemMessage(content=_API_SYSTEM),
-        HumanMessage(content=prompt),
-    ])
-    api_design = parse_llm_json(response.content)
+    api_design = await invoke_with_retry_and_validation(
+        model=model,
+        messages=[
+            SystemMessage(content=_API_SYSTEM),
+            HumanMessage(content=prompt),
+        ],
+        validator=validate_api_design
+    )
     print(f"[api_agent_node] API design ready for '{module}'")
 
     # Return ONLY the key we are updating

@@ -21,7 +21,8 @@ from routes import (
 from services.vector_store import (
     sweep_temporary_chunks,
     get_embeddings,
-    start_sweep_scheduler
+    start_sweep_scheduler,
+    stop_sweep_scheduler
 )
 
 @asynccontextmanager
@@ -34,7 +35,11 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"Warning: Startup check failed: {e}")
     yield
-    # Shutdown logic (if any) goes here
+    # Shutdown logic
+    try:
+        stop_sweep_scheduler()
+    except Exception as e:
+        print(f"Error stopping sweep scheduler: {e}")
 
 app = FastAPI(title="Archai Backend", version="1.0.0", lifespan=lifespan)
 

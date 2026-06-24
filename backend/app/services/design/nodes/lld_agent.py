@@ -1,6 +1,7 @@
 import json
 from langchain_core.messages import HumanMessage, SystemMessage
-from services.design.helpers import get_chat_model, parse_llm_json
+from services.design.helpers import get_chat_model, parse_llm_json, invoke_with_retry_and_validation
+from services.design.validators import validate_lld_design
 from services.design.state import GraphState
 
 _LLD_SYSTEM = (
@@ -57,12 +58,14 @@ async def lld_agent_node(state: GraphState) -> dict:
     )
     
     model = get_chat_model(temperature=0.05)
-    response = await model.ainvoke([
-        SystemMessage(content=_LLD_SYSTEM),
-        HumanMessage(content=prompt)
-    ])
-    
-    lld_design = parse_llm_json(response.content)
+    lld_design = await invoke_with_retry_and_validation(
+        model=model,
+        messages=[
+            SystemMessage(content=_LLD_SYSTEM),
+            HumanMessage(content=prompt)
+        ],
+        validator=validate_lld_design
+    )
     print(f"[lld_agent_node] LLD/DFD ready for '{module}'")
 
     return {"lld_design": lld_design}

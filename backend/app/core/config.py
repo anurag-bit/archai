@@ -9,6 +9,16 @@ PORT = int(os.getenv("PORT", "8080"))
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
+# Z.ai (Zhipu AI) configuration
+_zai_key_raw = os.getenv("ZAI_API_KEY") or os.getenv("ZHIPUAI_API_KEY") or os.getenv("ZHIPU_API_KEY") or ""
+ZAI_API_KEY = _zai_key_raw.strip() or None
+
+_zai_base_raw = os.getenv("ZAI_API_BASE") or os.getenv("ZHIPUAI_API_BASE") or os.getenv("ZHIPU_API_BASE") or ""
+ZAI_API_BASE = _zai_base_raw.strip() or "https://api.z.ai/api/coding/paas/v4/"
+
+_zai_model_raw = os.getenv("ZAI_MODEL") or ""
+ZAI_MODEL = _zai_model_raw.strip() or "glm-4.7-flash"
+
 # Vector store configuration
 CHROMA_HOST = os.getenv("CHROMA_HOST", "127.0.0.1")
 CHROMA_PORT = int(os.getenv("CHROMA_PORT", "8000"))

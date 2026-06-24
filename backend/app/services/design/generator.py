@@ -31,6 +31,7 @@ from services.design.nodes import (
     qa_agent_node,
     api_agent_node,
     lld_agent_node,
+    frontend_agent_node,
     save_module_design_node,
 )
 from core.config import MAX_QA_RETRIES, MAX_CONCURRENT_MODULES
@@ -73,6 +74,7 @@ def _build_module_graph() -> StateGraph:
     graph.add_node("human_input_node",   human_input_node)
     graph.add_node("api_agent",          api_agent_node)
     graph.add_node("lld_agent",          lld_agent_node)
+    graph.add_node("frontend_agent",     frontend_agent_node)
     graph.add_node("save_module_design", save_module_design_node)
 
     # Fixed edges
@@ -81,7 +83,8 @@ def _build_module_graph() -> StateGraph:
     graph.add_edge("dba_agent",      "qa_agent")
     graph.add_edge("human_input_node", "dba_agent")
     graph.add_edge("api_agent",      "lld_agent")
-    graph.add_edge("lld_agent",      "save_module_design")
+    graph.add_edge("lld_agent",      "frontend_agent")
+    graph.add_edge("frontend_agent", "save_module_design")
     graph.add_edge("save_module_design", END)
 
     # Conditional edges
@@ -309,6 +312,7 @@ async def generate_system_design(
                     "qa_retries":      0,
                     "api_design":      {},
                     "lld_design":      {},
+                    "frontend_design": {},
                     "module_design":   None,
                     # Architecture constraints
                     "tech_stack":          tech_stack,
@@ -503,6 +507,7 @@ async def regenerate_module_design(document_id: str, module_name: str) -> Dict[s
             "qa_retries":      0,
             "api_design":      {},
             "lld_design":      {},
+            "frontend_design": {},
             "module_design":   None,
             "tech_stack":          tech_stack,
             "design_principles":   design_principles,
@@ -649,6 +654,7 @@ async def apply_schema_patch(
         "qa_retries":      0,
         "api_design":      {},
         "lld_design":      {},
+        "frontend_design": {},
         "tech_stack":          cached_result.get("techStack", ""),
         "design_principles":   cached_result.get("designPrinciples", ""),
         "security_protocols":  cached_result.get("securityProtocols", ""),
@@ -662,6 +668,10 @@ async def apply_schema_patch(
     # Run LLD Agent node
     lld_res = await lld_agent_node(state)
     state["lld_design"] = lld_res["lld_design"]
+
+    # Run Frontend Agent node
+    frontend_res = await frontend_agent_node(state)
+    state["frontend_design"] = frontend_res["frontend_design"]
 
     # Run Save Module Design Logic to compile final module design entry
     from services.design.nodes.save_module_design import generate_ddl_from_tables, sanitize_mermaid_er
@@ -689,6 +699,7 @@ async def apply_schema_patch(
             "api_endpoints":      api_endpoints,
             "dfd_mermaid":        state["lld_design"].get("dfd_mermaid", ""),
             "component_mermaid":  state["lld_design"].get("component_mermaid", ""),
+            "frontend_design":    state.get("frontend_design") or {},
             "raw_json":           merged,
         },
         "selected_chunks": selected_chunks,
