@@ -10,6 +10,7 @@ export async function POST(request: Request) {
     const techStack = (incomingFormData.get("tech_stack") as string) || "";
     const designPrinciples = (incomingFormData.get("design_principles") as string) || "";
     const securityProtocols = (incomingFormData.get("security_protocols") as string) || "";
+    const cloudProvider = (incomingFormData.get("cloud_provider") as string) || "aws";
 
     // Create a new standard FormData instance to send via fetch
     const formData = new FormData();
@@ -20,6 +21,7 @@ export async function POST(request: Request) {
     formData.append("tech_stack", techStack);
     formData.append("design_principles", designPrinciples);
     formData.append("security_protocols", securityProtocols);
+    formData.append("cloud_provider", cloudProvider);
 
     // Forward the request to the backend
     const response = await fetch("http://127.0.0.1:8080/api/design", {

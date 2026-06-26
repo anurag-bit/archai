@@ -10,17 +10,17 @@ if (typeof window !== "undefined") {
     theme: "dark",
     securityLevel: "loose",
     themeVariables: {
-      primaryColor: "#5d826d", // earthy sage green
-      primaryTextColor: "#f5f5f0", // warm off-white
-      lineColor: "#6e6e6a", // warm slate gray
-      primaryBorderColor: "#7aa08a", // sage accent
-      nodeBorder: "#252523", // charcoal border
-      mainBkg: "#0f0f0e", // warm coal background
-      actorBkg: "#0f0f0e",
-      actorBorder: "#252523",
-      signalColor: "#7aa08a",
-      signalLineColor: "#6e6e6a",
-      cardinalityStroke: "#6e6e6a",
+      primaryColor: "#27272A", // Surface Dark (#27272A)
+      primaryTextColor: "#FAFAFA", // Text Dark (#FAFAFA)
+      lineColor: "#4B5563", // Primary Light / Line Color (#4B5563)
+      primaryBorderColor: "#38BDF8", // Accent Dark (#38BDF8)
+      nodeBorder: "#3F3F46", // subtle border contrast
+      mainBkg: "#18181B", // Background Dark (#18181B)
+      actorBkg: "#27272A", // Surface Dark (#27272A)
+      actorBorder: "#3F3F46",
+      signalColor: "#38BDF8", // Accent Dark (#38BDF8)
+      signalLineColor: "#4B5563",
+      cardinalityStroke: "#4B5563",
     },
   });
 }
@@ -150,66 +150,66 @@ interface IconMapItem {
 
 const ICON_MAPPING: IconMapItem[] = [
   // Frameworks & Libraries
-  { keywords: ["next.js", "nextjs"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/next.svg" },
-  { keywords: ["react"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/react.svg" },
-  { keywords: ["vue"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/vue.svg" },
-  { keywords: ["angular"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/angular.svg" },
-  { keywords: ["svelte"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/svelte.svg" },
-  { keywords: ["fastapi"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/fastapi.svg" },
-  { keywords: ["django"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/django.svg" },
-  { keywords: ["flask"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/flask.svg" },
-  { keywords: ["express"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/express.svg" },
+  { keywords: ["next.js", "nextjs"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/next.svg", invert: true },
+  { keywords: ["react"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/react.svg",invert:true },
+  { keywords: ["vue"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/vue.svg",invert:true },
+  { keywords: ["angular"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/angular.svg", invert:true },
+  { keywords: ["svelte"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/svelte.svg", invert:true },
+  { keywords: ["fastapi"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/fastapi.svg", invert:true },
+  { keywords: ["django"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/django.svg", invert:true },
+  { keywords: ["flask"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/flask.svg", invert: true },
+  { keywords: ["express"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/express.svg", invert: true },
   { keywords: ["nestjs", "nest.js"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/nest.svg" },
-  { keywords: ["spring boot", "springboot"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/springboot.svg" },
-  { keywords: ["spring framework", "spring"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/spring.svg" },
-  { keywords: ["laravel"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/laravel.svg" },
-  { keywords: ["flutter"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/flutter.svg" },
+  { keywords: ["spring boot", "springboot"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/springboot.svg", invert:true  },
+  { keywords: ["spring framework", "spring"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/spring.svg", invert:true },
+  { keywords: ["laravel"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/laravel.svg", invert:true },
+  { keywords: ["flutter"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/flutter.svg", invert:true },
 
   // Databases & Caches
-  { keywords: ["postgresql", "postgres"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/postgres.svg" },
-  { keywords: ["redis"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/redis.svg" },
-  { keywords: ["mysql"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/mysql.svg" },
-  { keywords: ["mongodb", "mongo"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/mongodb.svg" },
-  { keywords: ["sqlite"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/sqlite.svg" },
-  { keywords: ["cassandra"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/cassandra.svg" },
-  { keywords: ["dynamodb"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/aws-dynamodb.svg" },
-  { keywords: ["elasticsearch", "opensearch"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/elasticsearch.svg" },
-  { keywords: ["supabase"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/supabase.svg" },
-  { keywords: ["firebase"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/firebase.svg" },
-  { keywords: ["prisma"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/prisma.svg" },
+  { keywords: ["postgresql", "postgres"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/postgres.svg", invert: true },
+  { keywords: ["redis"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/redis.svg", invert: true },
+  { keywords: ["mysql"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/mysql.svg", invert:true        },
+  { keywords: ["mongodb", "mongo"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/mongodb.svg", invert:true },
+  { keywords: ["sqlite"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/sqlite.svg", invert:true },
+  { keywords: ["cassandra"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/cassandra.svg", invert:true },
+  { keywords: ["dynamodb"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/aws-dynamodb.svg", invert:true },
+  { keywords: ["elasticsearch", "opensearch"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/elasticsearch.svg", invert:true },
+  { keywords: ["supabase"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/supabase.svg", invert:true },
+  { keywords: ["firebase"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/firebase.svg", invert:true },
+  { keywords: ["prisma"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/prisma.svg", invert: true },
 
   // Languages & Runtimes
-  { keywords: ["nodejs", "node.js", "node run"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/node.svg" },
-  { keywords: ["python"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/python.svg" },
-  { keywords: ["golang", "go lang"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/go.svg" },
-  { keywords: ["rust"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/rust.svg" },
-  { keywords: ["java "], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/java.svg" },
-  { keywords: ["typescript", "ts"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/typescript.svg" },
-  { keywords: ["javascript", "js"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/javascript.svg" },
-  { keywords: ["cpp", "c++"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/cpp.svg" },
-  { keywords: ["ruby"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/ruby.svg" },
-  { keywords: ["php"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/php.svg" },
-  { keywords: ["elixir"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/elixir.svg" },
-  { keywords: ["swift"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/swift.svg" },
-  { keywords: ["kotlin"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/kotlin.svg" },
+  { keywords: ["nodejs", "node.js", "node run"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/node.svg", invert:true },
+  { keywords: ["python"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/python.svg", invert:true },
+  { keywords: ["golang", "go lang"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/go.svg", invert:true },
+  { keywords: ["rust"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/rust.svg", invert: true },
+  { keywords: ["java "], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/java.svg", invert:true },
+  { keywords: ["typescript", "ts"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/typescript.svg", invert:true },
+  { keywords: ["javascript", "js"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/javascript.svg", invert:true },
+  { keywords: ["cpp", "c++"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/cpp.svg", invert:true },
+  { keywords: ["ruby"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/ruby.svg", invert:true },
+  { keywords: ["php"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/php.svg", invert:true },
+  { keywords: ["elixir"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/elixir.svg", invert:true },
+  { keywords: ["swift"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/swift.svg", invert:true },
+  { keywords: ["kotlin"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/kotlin.svg", invert:true },
 
   // DevOps & Server
   { keywords: ["docker"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/docker.svg" },
-  { keywords: ["kubernetes", "k8s", "eks", "gke", "aks"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/k8s-kubernetes.svg" },
+  { keywords: ["kubernetes", "k8s", "eks", "gke", "aks"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/k8s-kubernetes.svg", invert:true  },
   { keywords: ["terraform"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/terraform.svg" },
-  { keywords: ["ansible"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/ansible.svg" },
+  { keywords: ["ansible"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/ansible.svg", invert: true },
   { keywords: ["nginx"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/nginx.svg" },
-  { keywords: ["apache kafka", "kafka"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/kafka.svg" },
+  { keywords: ["apache kafka", "kafka"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/kafka.svg", invert: true },
   { keywords: ["rabbitmq"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/rabbitmq.svg" },
   { keywords: ["prometheus"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/prometheus.svg" },
   { keywords: ["grafana"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/grafana.svg" },
-  { keywords: ["github actions", "github-actions"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/github-actions.svg" },
+  { keywords: ["github actions", "github-actions"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/github-actions.svg", invert: true },
   { keywords: ["jenkins"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/jenkins.svg" },
   { keywords: ["gitlab"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/gitlab.svg" },
 
   // Cloud Platforms
   { keywords: ["cloudflare"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/cloudflare.svg" },
-  { keywords: ["vercel"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/vercel.svg" },
+  { keywords: ["vercel"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/vercel.svg", invert: true },
   { keywords: ["netlify"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/netlify.svg" },
   { keywords: ["heroku"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/heroku.svg" },
   { keywords: ["digitalocean", "digital ocean"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/digitalocean.svg" },
@@ -227,7 +227,7 @@ const ICON_MAPPING: IconMapItem[] = [
   { keywords: ["ecs", "elastic container service"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/aws-elastic-container-service.svg" },
   { keywords: ["ec2", "elastic compute cloud"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/aws-ec2.svg" },
   { keywords: ["waf", "web application firewall"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/aws-waf.svg" },
-  { keywords: ["aws", "amazon"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/aws.svg" },
+  { keywords: ["aws", "amazon"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/aws.svg", invert: true },
 
   // GCP / Google Cloud
   { keywords: ["google cloud platform", "google cloud", "gcp"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/google-cloud.svg" },
@@ -236,11 +236,106 @@ const ICON_MAPPING: IconMapItem[] = [
   { keywords: ["azure"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/azure.svg" },
 
   // AI & ML
-  { keywords: ["openai", "chatgpt"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/openai.svg" },
+  { keywords: ["openai", "chatgpt"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/openai.svg", invert: true },
   { keywords: ["hugging face", "huggingface"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/hugging-face.svg" },
   { keywords: ["pytorch"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/pytorch.svg" },
   { keywords: ["tensorflow"], url: "https://storage.googleapis.com/eraser-public-assets/canvas-icons/tensorflow.svg" },
 ];
+
+function isDarkTheme(): boolean {
+  if (typeof window === "undefined") return true;
+  const hasDarkClass = document.documentElement.classList.contains("dark") || document.body.classList.contains("dark");
+  const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+  const hasLightClass = document.documentElement.classList.contains("light") || document.body.classList.contains("light");
+  
+  if (hasLightClass) return false;
+  if (hasDarkClass) return true;
+  return prefersDark || true; // Default to true since the platform is dark theme
+}
+
+function reinitializeMermaid() {
+  const isDark = isDarkTheme();
+  mermaid.initialize({
+    startOnLoad: false,
+    theme: isDark ? "dark" : "default",
+    securityLevel: "loose",
+    themeVariables: isDark ? {
+      primaryColor: "#27272A",
+      primaryTextColor: "#FAFAFA",
+      lineColor: "#4B5563",
+      primaryBorderColor: "#38BDF8",
+      nodeBorder: "#3F3F46",
+      mainBkg: "#18181B",
+      actorBkg: "#27272A",
+      actorBorder: "#3F3F46",
+      signalColor: "#38BDF8",
+      signalLineColor: "#4B5563",
+      cardinalityStroke: "#4B5563",
+    } : {
+      primaryColor: "#FFFFFF",
+      primaryTextColor: "#18181B",
+      lineColor: "#D1D5DB",
+      primaryBorderColor: "#0EA5E9",
+      nodeBorder: "#E5E7EB",
+      mainBkg: "#FCFCFC",
+      actorBkg: "#FFFFFF",
+      actorBorder: "#D1D5DB",
+      signalColor: "#0EA5E9",
+      signalLineColor: "#D1D5DB",
+      cardinalityStroke: "#D1D5DB",
+    },
+  });
+}
+
+interface PathCommand {
+  type: string;
+  args: number[];
+}
+
+function parsePathD(d: string): PathCommand[] {
+  const commands: PathCommand[] = [];
+  const commandRegex = /([mlhvcsqtaz])/ig;
+  const parts = d.split(commandRegex);
+  
+  const numRegex = /[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?/g;
+  for (let i = 1; i < parts.length; i += 2) {
+    const type = parts[i];
+    const argsStr = parts[i + 1];
+    
+    const args: number[] = [];
+    if (argsStr) {
+      let match;
+      while ((match = numRegex.exec(argsStr)) !== null) {
+        args.push(parseFloat(match[0]));
+      }
+    }
+    commands.push({ type, args });
+  }
+  return commands;
+}
+
+function stringifyPathD(commands: PathCommand[]): string {
+  return commands.map(c => c.type + " " + c.args.join(" ")).join(" ");
+}
+
+function parseNodeId(nodeEl: Element): string | null {
+  const dataId = nodeEl.getAttribute('data-id');
+  if (dataId) return dataId;
+  
+  const idAttr = nodeEl.getAttribute('id');
+  if (idAttr) {
+    const parts = idAttr.split('-');
+    if (parts.length >= 2) {
+      let extracted = parts.slice(1);
+      if (extracted.length > 1 && !isNaN(Number(extracted[extracted.length - 1]))) {
+        extracted = extracted.slice(0, -1);
+      }
+      return extracted.join('-');
+    }
+    return idAttr;
+  }
+  return null;
+}
 
 function getIconForTech(techName: string): IconMapItem | null {
   const normalized = techName.toLowerCase();
@@ -335,7 +430,8 @@ function injectTechnologyIcons(chart: string): string {
           return match;
         }
         
-        const filterStyle = iconInfo.invert ? "filter: invert(1) brightness(2);" : "";
+        const shouldInvert = iconInfo.invert && isDarkTheme();
+        const filterStyle = shouldInvert ? "filter: invert(1) brightness(2);" : "";
         const imgTag = `<img src='${iconInfo.url}' width='20' height='20' style='vertical-align: middle; margin-right: 6px; display: inline-block; ${filterStyle}'/>`;
         
         return `${nodeId}${openBrackets}"${imgTag}${finalLabel.replace(/"/g, "'")}"${finalClose}`;
@@ -460,6 +556,17 @@ export function MermaidRenderer({ chart }: { chart: string }) {
   const fullscreenContainerRef = useRef<HTMLDivElement>(null);
   const fullscreenViewportRef = useRef<HTMLDivElement>(null);
 
+  const nodeDragRef = useRef<{
+    element: SVGGElement;
+    nodeId: string;
+    startX: number;
+    startY: number;
+    initialTransformX: number;
+    initialTransformY: number;
+    startPaths: Array<{ path: SVGPathElement; originalCommands: PathCommand[] }>;
+    endPaths: Array<{ path: SVGPathElement; originalCommands: PathCommand[] }>;
+  } | null>(null);
+
   const [error, setError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -483,6 +590,15 @@ export function MermaidRenderer({ chart }: { chart: string }) {
 
   useEffect(() => {
     setMounted(true);
+  }, []);
+
+  const [themeSeq, setThemeSeq] = useState(0);
+  useEffect(() => {
+    const handleThemeChange = () => {
+      setThemeSeq(prev => prev + 1);
+    };
+    window.addEventListener("theme-change", handleThemeChange);
+    return () => window.removeEventListener("theme-change", handleThemeChange);
   }, []);
 
   useEffect(() => {
@@ -620,6 +736,7 @@ export function MermaidRenderer({ chart }: { chart: string }) {
     const renderChart = async () => {
       try {
         setError(null);
+        reinitializeMermaid();
         const cleanChart = preprocessMermaidChart(chart);
         const renderId = `mermaid-${Math.random().toString(36).substring(2, 9)}`;
         const { svg } = await serializedRender(renderId, cleanChart);
@@ -660,7 +777,7 @@ export function MermaidRenderer({ chart }: { chart: string }) {
     return () => {
       active = false;
     };
-  }, [chart]);
+  }, [chart, themeSeq]);
 
   // Fullscreen render
   useEffect(() => {
@@ -669,6 +786,7 @@ export function MermaidRenderer({ chart }: { chart: string }) {
 
     const renderFullscreenChart = async () => {
       try {
+        reinitializeMermaid();
         const cleanChart = preprocessMermaidChart(chart);
         const renderId = `mermaid-fs-${Math.random().toString(36).substring(2, 9)}`;
         const { svg } = await serializedRender(renderId, cleanChart);
@@ -695,7 +813,7 @@ export function MermaidRenderer({ chart }: { chart: string }) {
     return () => {
       active = false;
     };
-  }, [isFullscreen, chart, svgDimensions]);
+  }, [isFullscreen, chart, svgDimensions, themeSeq]);
 
   // Auto resize listener
   useEffect(() => {
@@ -745,12 +863,124 @@ export function MermaidRenderer({ chart }: { chart: string }) {
 
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return;
+    
+    const nodeEl = (e.target as Element).closest(".node") as SVGGElement | null;
+    if (nodeEl) {
+      e.stopPropagation();
+      e.currentTarget.setPointerCapture(e.pointerId);
+      
+      const id = nodeEl.getAttribute('id') || '';
+      const dataId = nodeEl.getAttribute('data-id') || '';
+      const parsedId = parseNodeId(nodeEl);
+      
+      const startSelectors = [];
+      if (id) startSelectors.push(`.LS-${id}`);
+      if (dataId) startSelectors.push(`.LS-${dataId}`);
+      if (parsedId && parsedId !== id && parsedId !== dataId) {
+        startSelectors.push(`.LS-${parsedId}`);
+      }
+      
+      const endSelectors = [];
+      if (id) endSelectors.push(`.LE-${id}`);
+      if (dataId) endSelectors.push(`.LE-${dataId}`);
+      if (parsedId && parsedId !== id && parsedId !== dataId) {
+        endSelectors.push(`.LE-${parsedId}`);
+      }
+      
+      const transformAttr = nodeEl.getAttribute("transform") || "";
+      const match = transformAttr.match(/translate\(([-\d\.]+)\s*,\s*([-\d\.]+)\)/);
+      let initialTransformX = 0;
+      let initialTransformY = 0;
+      if (match) {
+        initialTransformX = parseFloat(match[1]);
+        initialTransformY = parseFloat(match[2]);
+      }
+      
+      const activeContainer = containerRef.current;
+      const startPathEls = startSelectors.length > 0
+        ? activeContainer?.querySelectorAll(startSelectors.join(', ')) || []
+        : [];
+      const endPathEls = endSelectors.length > 0
+        ? activeContainer?.querySelectorAll(endSelectors.join(', ')) || []
+        : [];
+      
+      const startPaths = Array.from(startPathEls).map(el => {
+        const path = el.querySelector('path') || el;
+        const d = path.getAttribute('d') || '';
+        return { path: path as SVGPathElement, originalCommands: parsePathD(d) };
+      });
+      const endPaths = Array.from(endPathEls).map(el => {
+        const path = el.querySelector('path') || el;
+        const d = path.getAttribute('d') || '';
+        return { path: path as SVGPathElement, originalCommands: parsePathD(d) };
+      });
+      
+      nodeDragRef.current = {
+        element: nodeEl,
+        nodeId: dataId || id || parsedId || "",
+        startX: e.clientX,
+        startY: e.clientY,
+        initialTransformX,
+        initialTransformY,
+        startPaths,
+        endPaths,
+      };
+      return;
+    }
+
     setIsDragging(true);
     e.currentTarget.setPointerCapture(e.pointerId);
     setDragStart({ x: e.clientX - transform.x, y: e.clientY - transform.y });
   };
 
   const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (nodeDragRef.current) {
+      const dragInfo = nodeDragRef.current;
+      const scale = transform.scale;
+      const dx = (e.clientX - dragInfo.startX) / scale;
+      const dy = (e.clientY - dragInfo.startY) / scale;
+      
+      const newX = dragInfo.initialTransformX + dx;
+      const newY = dragInfo.initialTransformY + dy;
+      dragInfo.element.setAttribute("transform", `translate(${newX}, ${newY})`);
+      
+      // Update starting edges
+      for (const edge of dragInfo.startPaths) {
+        const commands = JSON.parse(JSON.stringify(edge.originalCommands)) as PathCommand[];
+        if (commands.length > 0) {
+          commands[0].args[0] += dx;
+          commands[0].args[1] += dy;
+          if (commands.length > 1 && ["c", "q", "s", "t"].includes(commands[1].type.toLowerCase())) {
+            commands[1].args[0] += dx;
+            commands[1].args[1] += dy;
+          }
+          edge.path.setAttribute("d", stringifyPathD(commands));
+        }
+      }
+      
+      // Update ending edges
+      for (const edge of dragInfo.endPaths) {
+        const commands = JSON.parse(JSON.stringify(edge.originalCommands)) as PathCommand[];
+        if (commands.length > 0) {
+          const last = commands[commands.length - 1];
+          const len = last.args.length;
+          if (len >= 2) {
+            last.args[len - 2] += dx;
+            last.args[len - 1] += dy;
+          }
+          if (last.type.toLowerCase() === "c" && len >= 6) {
+            last.args[2] += dx;
+            last.args[3] += dy;
+          } else if (last.type.toLowerCase() === "s" && len >= 4) {
+            last.args[0] += dx;
+            last.args[1] += dy;
+          }
+          edge.path.setAttribute("d", stringifyPathD(commands));
+        }
+      }
+      return;
+    }
+
     if (!isDragging) return;
     setTransform({
       scale: transform.scale,
@@ -760,6 +990,12 @@ export function MermaidRenderer({ chart }: { chart: string }) {
   };
 
   const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (nodeDragRef.current) {
+      nodeDragRef.current = null;
+      e.currentTarget.releasePointerCapture(e.pointerId);
+      return;
+    }
+    
     if (!isDragging) return;
     setIsDragging(false);
     e.currentTarget.releasePointerCapture(e.pointerId);
@@ -784,12 +1020,124 @@ export function MermaidRenderer({ chart }: { chart: string }) {
 
   const handleFsPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return;
+    
+    const nodeEl = (e.target as Element).closest(".node") as SVGGElement | null;
+    if (nodeEl) {
+      e.stopPropagation();
+      e.currentTarget.setPointerCapture(e.pointerId);
+      
+      const id = nodeEl.getAttribute('id') || '';
+      const dataId = nodeEl.getAttribute('data-id') || '';
+      const parsedId = parseNodeId(nodeEl);
+      
+      const startSelectors = [];
+      if (id) startSelectors.push(`.LS-${id}`);
+      if (dataId) startSelectors.push(`.LS-${dataId}`);
+      if (parsedId && parsedId !== id && parsedId !== dataId) {
+        startSelectors.push(`.LS-${parsedId}`);
+      }
+      
+      const endSelectors = [];
+      if (id) endSelectors.push(`.LE-${id}`);
+      if (dataId) endSelectors.push(`.LE-${dataId}`);
+      if (parsedId && parsedId !== id && parsedId !== dataId) {
+        endSelectors.push(`.LE-${parsedId}`);
+      }
+      
+      const transformAttr = nodeEl.getAttribute("transform") || "";
+      const match = transformAttr.match(/translate\(([-\d\.]+)\s*,\s*([-\d\.]+)\)/);
+      let initialTransformX = 0;
+      let initialTransformY = 0;
+      if (match) {
+        initialTransformX = parseFloat(match[1]);
+        initialTransformY = parseFloat(match[2]);
+      }
+      
+      const activeContainer = fullscreenContainerRef.current;
+      const startPathEls = startSelectors.length > 0
+        ? activeContainer?.querySelectorAll(startSelectors.join(', ')) || []
+        : [];
+      const endPathEls = endSelectors.length > 0
+        ? activeContainer?.querySelectorAll(endSelectors.join(', ')) || []
+        : [];
+      
+      const startPaths = Array.from(startPathEls).map(el => {
+        const path = el.querySelector('path') || el;
+        const d = path.getAttribute('d') || '';
+        return { path: path as SVGPathElement, originalCommands: parsePathD(d) };
+      });
+      const endPaths = Array.from(endPathEls).map(el => {
+        const path = el.querySelector('path') || el;
+        const d = path.getAttribute('d') || '';
+        return { path: path as SVGPathElement, originalCommands: parsePathD(d) };
+      });
+      
+      nodeDragRef.current = {
+        element: nodeEl,
+        nodeId: dataId || id || parsedId || "",
+        startX: e.clientX,
+        startY: e.clientY,
+        initialTransformX,
+        initialTransformY,
+        startPaths,
+        endPaths,
+      };
+      return;
+    }
+
     setIsFsDragging(true);
     e.currentTarget.setPointerCapture(e.pointerId);
     setFsDragStart({ x: e.clientX - fullscreenTransform.x, y: e.clientY - fullscreenTransform.y });
   };
 
   const handleFsPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (nodeDragRef.current) {
+      const dragInfo = nodeDragRef.current;
+      const scale = fullscreenTransform.scale;
+      const dx = (e.clientX - dragInfo.startX) / scale;
+      const dy = (e.clientY - dragInfo.startY) / scale;
+      
+      const newX = dragInfo.initialTransformX + dx;
+      const newY = dragInfo.initialTransformY + dy;
+      dragInfo.element.setAttribute("transform", `translate(${newX}, ${newY})`);
+      
+      // Update starting edges
+      for (const edge of dragInfo.startPaths) {
+        const commands = JSON.parse(JSON.stringify(edge.originalCommands)) as PathCommand[];
+        if (commands.length > 0) {
+          commands[0].args[0] += dx;
+          commands[0].args[1] += dy;
+          if (commands.length > 1 && ["c", "q", "s", "t"].includes(commands[1].type.toLowerCase())) {
+            commands[1].args[0] += dx;
+            commands[1].args[1] += dy;
+          }
+          edge.path.setAttribute("d", stringifyPathD(commands));
+        }
+      }
+      
+      // Update ending edges
+      for (const edge of dragInfo.endPaths) {
+        const commands = JSON.parse(JSON.stringify(edge.originalCommands)) as PathCommand[];
+        if (commands.length > 0) {
+          const last = commands[commands.length - 1];
+          const len = last.args.length;
+          if (len >= 2) {
+            last.args[len - 2] += dx;
+            last.args[len - 1] += dy;
+          }
+          if (last.type.toLowerCase() === "c" && len >= 6) {
+            last.args[2] += dx;
+            last.args[3] += dy;
+          } else if (last.type.toLowerCase() === "s" && len >= 4) {
+            last.args[0] += dx;
+            last.args[1] += dy;
+          }
+          edge.path.setAttribute("d", stringifyPathD(commands));
+        }
+      }
+      return;
+    }
+
     if (!isFsDragging) return;
     setFullscreenTransform({
       scale: fullscreenTransform.scale,
@@ -799,6 +1147,12 @@ export function MermaidRenderer({ chart }: { chart: string }) {
   };
 
   const handleFsPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (nodeDragRef.current) {
+      nodeDragRef.current = null;
+      e.currentTarget.releasePointerCapture(e.pointerId);
+      return;
+    }
+    
     if (!isFsDragging) return;
     setIsFsDragging(false);
     e.currentTarget.releasePointerCapture(e.pointerId);

@@ -106,6 +106,28 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [activeStep, setActiveStep] = useState(0);
+
+  const [theme, setTheme] = useState<"dark" | "light">("dark");
+
+  useEffect(() => {
+    const savedTheme = localStorage.getItem("theme") as "dark" | "light" | null;
+    if (savedTheme) {
+      setTheme(savedTheme);
+      document.documentElement.classList.remove("dark", "light");
+      document.documentElement.classList.add(savedTheme);
+    } else {
+      document.documentElement.classList.add("dark");
+    }
+  }, []);
+
+  const toggleTheme = () => {
+    const nextTheme = theme === "dark" ? "light" : "dark";
+    setTheme(nextTheme);
+    localStorage.setItem("theme", nextTheme);
+    document.documentElement.classList.remove("dark", "light");
+    document.documentElement.classList.add(nextTheme);
+    window.dispatchEvent(new Event("theme-change"));
+  };
   
   // Dashboard Workspace State
   const [activeTab, setActiveTab] = useState<"architecture" | "database" | "frontend" | "testing" | "requirements" | "terraform" | "openapi" | "devops" | "roadmap">("architecture");
@@ -130,7 +152,12 @@ export default function Home() {
   const [techStack, setTechStack] = useState("");
   const [designPrinciples, setDesignPrinciples] = useState("");
   const [securityProtocols, setSecurityProtocols] = useState("");
+  const [cloudProvider, setCloudProvider] = useState("aws");
   const [showAdvanced, setShowAdvanced] = useState(false);
+
+  // Chat refinement state
+  const [refineInput, setRefineInput] = useState("");
+  const [isRefining, setIsRefining] = useState(false);
 
   // Open questions answers state
   const [answers, setAnswers] = useState<Record<number, string>>({});
@@ -169,6 +196,7 @@ export default function Home() {
       formData.set("tech_stack", techStack.trim());
       formData.set("design_principles", designPrinciples.trim());
       formData.set("security_protocols", securityProtocols.trim());
+      formData.set("cloud_provider", cloudProvider.trim());
 
       const activeAnswers = customAnswers ?? answers;
       const answersText = result ? result.openQuestions.map((q, idx) => {
@@ -331,6 +359,43 @@ export default function Home() {
     }
   };
 
+  const handleRefineSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!result || !result.documentId || !refineInput.trim()) return;
+
+    setIsRefining(true);
+    setError(null);
+    try {
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL !== undefined
+        ? process.env.NEXT_PUBLIC_BACKEND_URL
+        : "http://127.0.0.1:8080";
+      const fetchUrl = `${backendUrl}/api/design/${result.documentId}/refine`;
+
+      const response = await fetch(fetchUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          message: refineInput.trim(),
+        }),
+      });
+
+      if (!response.ok) {
+        const errPayload = await response.json();
+        throw new Error(errPayload.detail || "Failed to refine the design.");
+      }
+
+      const payload = (await response.json()) as DesignResponse;
+      setResult(payload);
+      setRefineInput("");
+    } catch (err: any) {
+      setError(err.message || "Failed to refine design.");
+    } finally {
+      setIsRefining(false);
+    }
+  };
+
   const copyFullMarkdown = async () => {
     if (!result) return;
     const tfBlock = result.terraformCode ? `\n\n# Terraform IaC Configuration\n\n\`\`\`terraform\n${result.terraformCode}\n\`\`\`` : "";
@@ -394,13 +459,15 @@ export default function Home() {
   };
 
   return (
-    <div className="flex flex-col min-h-screen text-slate-100 bg-[#030712]">
+    <div className="flex flex-col min-h-screen text-slate-100 bg-slate-950">
       <Header
         result={result}
         copiedFull={copiedFull}
         onCopyFull={copyFullMarkdown}
         onDownload={downloadReport}
         onReset={resetWorkspace}
+        theme={theme}
+        onToggleTheme={toggleTheme}
       />
       
       <LoadingOverlay isGenerating={isGenerating} activeStep={activeStep} />
@@ -408,7 +475,7 @@ export default function Home() {
       {result ? (
         <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
           {/* Left Sidebar Pane */}
-          <aside className="glass-panel border-r border-white/10 p-5 flex flex-col gap-6 overflow-y-auto lg:h-[calc(100vh-69px)] lg:w-[320px] xl:w-[360px] flex-shrink-0">
+          <aside className="bg-slate-800/60 backdrop-blur-xl border-r border-white/10 p-5 flex flex-col gap-6 overflow-y-auto lg:h-[calc(100vh-69px)] lg:w-[320px] xl:w-[360px] flex-shrink-0">
             <ProjectSummary summary={result.projectSummary} />
             <Assumptions assumptions={result.assumptions} />
             
@@ -435,11 +502,11 @@ export default function Home() {
 
             {/* Viewport Render Area */}
             <div className="flex-1 overflow-y-auto p-5 md:p-6">
-              <div className={`${activeTab === "database" && result.domainDesigns && result.domainDesigns.length > 0 ? "max-w-6xl" : "max-w-4xl"} mx-auto w-full glass-panel p-6 md:p-8 rounded-2xl animate-slide-up bg-slate-950/40`}>
+              <div className={`${activeTab === "database" && result.domainDesigns && result.domainDesigns.length > 0 ? "max-w-6xl" : "max-w-4xl"} mx-auto w-full bg-slate-800/60 backdrop-blur-xl border border-white/5 p-6 md:p-8 rounded-2xl animate-slide-up bg-slate-950/40`}>
                 {activeTab === "requirements" ? (
                   <div className="space-y-4">
                     <div className="flex items-center justify-between border-b border-white/10 pb-4">
-                      <h2 className="text-base font-semibold text-white">Original Requirements Document</h2>
+                      <h2 className="text-base font-semibold text-slate-100">Original Requirements Document</h2>
                       <button
                         onClick={copyRequirementsText}
                         className="text-xs bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white px-3 py-1.5 rounded-lg border border-white/5 transition cursor-pointer flex items-center gap-1.5 font-semibold"
@@ -465,7 +532,7 @@ export default function Home() {
                   <div className="space-y-4">
                     <div className="flex items-center justify-between border-b border-white/10 pb-4">
                       <div>
-                        <h2 className="text-base font-semibold text-white">OpenAPI Specification (openapi.yaml)</h2>
+                        <h2 className="text-base font-semibold text-slate-100">OpenAPI Specification (openapi.yaml)</h2>
                         <p className="text-xs text-slate-500 mt-1">Cohesive REST API specification generated from all module designs</p>
                       </div>
                       <button
@@ -501,7 +568,7 @@ export default function Home() {
                   <div className="space-y-4">
                     <div className="flex items-center justify-between border-b border-white/10 pb-4">
                       <div>
-                        <h2 className="text-base font-semibold text-white">Terraform Infrastructure as Code (main.tf)</h2>
+                        <h2 className="text-base font-semibold text-slate-100">Terraform Infrastructure as Code (main.tf)</h2>
                         <p className="text-xs text-slate-500 mt-1">AWS Provider modules based on architecture specification</p>
                       </div>
                       <button
@@ -537,7 +604,7 @@ export default function Home() {
                   <div className="space-y-4">
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-white/10 pb-4 gap-4">
                       <div>
-                        <h2 className="text-base font-semibold text-white">CI/CD & Deployment Configurations</h2>
+                        <h2 className="text-base font-semibold text-slate-100">CI/CD & Deployment Configurations</h2>
                         <p className="text-xs text-slate-500 mt-1">Dockerfile, Docker Compose, CI/CD pipelines, and Kubernetes setups</p>
                       </div>
 
@@ -639,7 +706,7 @@ export default function Home() {
                   <div className="space-y-6">
                     <div className="flex flex-col md:flex-row md:items-center md:justify-between border-b border-white/10 pb-4 gap-4">
                       <div>
-                        <h2 className="text-base font-semibold text-white">Project Development Roadmap & Plan</h2>
+                        <h2 className="text-base font-semibold text-slate-100">Project Development Roadmap & Plan</h2>
                         <p className="text-xs text-slate-500 mt-1">Timeline, effort estimation, module dependencies, and technical risk register</p>
                       </div>
 
@@ -784,7 +851,7 @@ export default function Home() {
                 ) : (
                   <div className="space-y-4">
                     <div className="flex items-center justify-between border-b border-white/10 pb-4">
-                      <h2 className="text-base font-semibold text-white">
+                      <h2 className="text-base font-semibold text-slate-100">
                         Raw {activeTab === "architecture" ? "Architecture" : "Schema"} Markdown Source
                       </h2>
                       <button
@@ -803,19 +870,53 @@ export default function Home() {
                 )}
               </div>
             </div>
+
+            {/* Persistent Chat-to-Refine Bar */}
+            <div className="border-t border-white/5 bg-slate-950/80 p-4 backdrop-blur-md flex flex-col gap-2 flex-shrink-0">
+              <form onSubmit={handleRefineSubmit} className="flex gap-2 max-w-4xl mx-auto w-full">
+                <input
+                  type="text"
+                  placeholder="Ask to refine the design... (e.g., 'Remove audit_log table from Billing module')"
+                  value={refineInput}
+                  onChange={(e) => setRefineInput(e.target.value)}
+                  disabled={isRefining}
+                  className="flex-1 rounded-xl border border-white/10 bg-slate-900/60 px-4 py-2.5 text-xs text-slate-100 outline-none placeholder:text-slate-655 focus:border-cyan-400/40 focus:ring-1 focus:ring-cyan-400/20 disabled:opacity-50"
+                />
+                <button
+                  type="submit"
+                  disabled={isRefining || !refineInput.trim()}
+                  className="rounded-xl bg-cyan-500 hover:bg-cyan-400 px-5 py-2.5 text-xs font-semibold text-slate-950 transition-all duration-200 cursor-pointer disabled:opacity-50 flex items-center gap-1.5 shadow-md shadow-cyan-950/30"
+                >
+                  {isRefining ? (
+                    <>
+                      <div className="w-3.5 h-3.5 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
+                      <span>Refining...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Refine</span>
+                      <span>✨</span>
+                    </>
+                  )}
+                </button>
+              </form>
+              <p className="text-[10px] text-slate-500 text-center">
+                Refinements dynamically route to the target module's database agent and re-flow down to API and low-level design layers.
+              </p>
+            </div>
           </main>
         </div>
       ) : (
         /* Original Form/Landing Layout */
         <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8 lg:py-12 animate-fade-in">
           <section className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
-            <div className="glass-panel p-6 sm:p-8 rounded-[32px] flex flex-col justify-between shadow-2xl relative overflow-hidden">
+            <div className="bg-slate-800/65 backdrop-blur-xl border border-white/5 p-6 sm:p-8 rounded-[32px] flex flex-col justify-between shadow-2xl relative overflow-hidden">
               <div className="absolute top-0 right-0 w-80 h-80 bg-cyan-400/5 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20"></div>
               <div>
                 <div className="inline-flex items-center rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-cyan-300">
                   SRS to Architecture
                 </div>
-                <h1 className="mt-5 text-3xl font-extrabold tracking-tight text-white sm:text-4xl leading-tight">
+                <h1 className="mt-5 text-3xl font-extrabold tracking-tight text-slate-100 sm:text-4xl leading-tight">
                   Turn product briefs into system architectures instantly.
                 </h1>
                 <p className="mt-4 text-sm leading-6 text-slate-400">
@@ -856,7 +957,7 @@ export default function Home() {
             </div>
 
             {/* Input Form Panel */}
-            <div className="glass-panel p-6 sm:p-8 rounded-[32px] flex flex-col justify-between shadow-2xl relative">
+            <div className="bg-slate-800/65 backdrop-blur-xl border border-white/5 p-6 sm:p-8 rounded-[32px] flex flex-col justify-between shadow-2xl relative">
               <form className="space-y-6 flex-1 flex flex-col" onSubmit={handleSubmit}>
                 <DocumentUpload
                   selectedFile={selectedFile}
@@ -896,10 +997,12 @@ export default function Home() {
                   techStack={techStack}
                   designPrinciples={designPrinciples}
                   securityProtocols={securityProtocols}
+                  cloudProvider={cloudProvider}
                   onShowAdvancedChange={setShowAdvanced}
                   onTechStackChange={setTechStack}
                   onDesignPrinciplesChange={setDesignPrinciples}
                   onSecurityProtocolsChange={setSecurityProtocols}
+                  onCloudProviderChange={setCloudProvider}
                 />
 
                 {/* Submission Error Banner */}

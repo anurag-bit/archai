@@ -1,4 +1,5 @@
 from typing import List, Dict, Any
+import asyncio
 import re
 from langchain_core.messages import HumanMessage, SystemMessage
 from services.design.helpers import get_chat_model, invoke_with_retry_and_validation
@@ -22,6 +23,9 @@ The software system consists of the following {MODULE_COUNT} modules:
 - Design Patterns: {DESIGN_PRINCIPLES}
 - Security: {SECURITY_PROTOCOLS}
 
+### HUMAN REFINEMENT INSTRUCTION (CRITICAL)
+{REFINEMENT_INSTRUCTION}
+
 ### YOUR TASK
 Design the comprehensive, production-grade architecture. You MUST output a detailed Markdown document with the following distinct sections. Do not skip any section.
 
@@ -41,18 +45,18 @@ CRITICAL RULES FOR MERMAID:
 - Create a `subgraph "{VPC_NAME}"` containing all resources.
 - Inside the network subnet structure, create `subgraph "Public Subnets"` and `subgraph "Private Subnets"`.
 - **Public Subnet:** Must contain the {LB_NAME} and {NAT_NAME}.
-- **Private Subnet:** Must contain the Application Nodes ({COMPUTE_LABEL}), the Database (PostgreSQL), and the Cache/Queue (Redis/SQS).
+- **Private Subnet:** Must contain the Application Nodes ({COMPUTE_LABEL}), the Database (PostgreSQL), and the Cache/Queue (Redis/{QUEUE_TECH}).
 - Show traffic flow: `Internet --> {IGW_NAME} --> {FLOW_LB} --> Private Subnet Nodes`.
 - Show egress flow: `Private Subnet Nodes --> {NAT_NAME} --> {IGW_NAME} --> Internet`.
 - Label nodes with specific tech (e.g., `{LB_LABEL}`).
 
 #### 3. Network Configuration & Routing
 - **VPC & Subnets:** Specify the IP range strategy (e.g., 10.0.0.0/16 VPC, 10.0.1.0/24 Public, 10.0.2.0/24 Private).
-- **Security Groups (SGs):** List the specific SGs and their inbound/outbound rules (e.g., `ALB-SG` allows 443 Inbound from Internet; `App-SG` allows 8080 Inbound only from `ALB-SG`; `DB-SG` allows 5432 Inbound only from `App-SG`).
-- **Routing Tables:** Explain how traffic is routed (Public routes to IGW, Private routes to NAT).
+- **Security & Firewall Rules ({SG_LABEL}):** List the specific rules and their inbound/outbound setup (e.g., load balancer allows 443 Inbound from Internet; Application Node allows traffic only from load balancer; Database allows traffic only from Application Node).
+- **Routing Tables:** Explain how traffic is routed (Public routes to {IGW_NAME}, Private routes to {NAT_NAME}).
 
 #### 4. Infrastructure & Compute Layer
-- Specify the containerization and hosting strategy (e.g., Docker, AWS EKS).
+- Specify the containerization and hosting strategy (e.g., Docker, {HOSTING_STRATEGY}).
 - Discuss auto-scaling policies based on CPU/Memory/Request count.
 
 #### 5. Data Layer & Caching
@@ -61,7 +65,7 @@ CRITICAL RULES FOR MERMAID:
 - **Search Engine:** Propose Elasticsearch/OpenSearch if complex querying is needed.
 
 #### 6. Asynchronous Processing & Queuing System
-- **Queue Technology:** Recommend RabbitMQ, AWS SQS, or Apache Kafka.
+- **Queue Technology:** Recommend RabbitMQ, {QUEUE_TECH}, or Apache Kafka.
 - **Event-Driven Workflows:** List at least 3 cross-module workflows that must be asynchronous.
 - **Background Workers:** Specify how workers consume these queues.
 
@@ -70,7 +74,7 @@ You MUST explicitly address how the system enforces the user's specific security
 - **Network Security:** WAF rules (SQLi, XSS), DDoS protection ({SHIELD_NAME}).
 - **Application Security:** Rate Limiting (Redis-backed at API Gateway), Backend Only Abstraction.
 - **Identity & Access Management (IAM):** Detail the RBAC implementation. How are JWT tokens issued, validated, and scoped?
-- **Data Security:** Encryption at rest (KMS) and in transit (TLS 1.3). Column-level encryption for PII.
+- **Data Security:** Encryption at rest ({KMS_NAME}) and in transit (TLS 1.3). Column-level encryption for PII.
 
 #### 8. Threat Model & Mitigations (STRIDE)
 Provide a Markdown table mapping the STRIDE threat model to specific architectural mitigations:
@@ -108,14 +112,18 @@ def get_cloud_specific_terms(provider: str) -> dict:
     if provider == "gcp":
         return {
             "vpc": "Cloud Provider VPC Network (Google Cloud)",
-            "load_balancer": "Cloud Load Balancer",
-            "nat_gateway": "Cloud NAT Gateway",
+            "load_balancer": "Cloud Load Balancing",
+            "nat_gateway": "Cloud NAT",
             "internet_gateway": "Cloud Router / Internet Gateway",
             "compute_label": "Google Kubernetes Engine (GKE) worker nodes",
             "lb_label": "GLB[GCP Cloud Load Balancer]",
             "flow_lb": "GLB",
             "shield": "Google Cloud Armor (DDoS Protection)",
-            "waf": "Cloud Armor"
+            "waf": "Cloud Armor",
+            "sg_label": "VPC Firewall Rules",
+            "hosting_strategy": "Google Kubernetes Engine (GKE)",
+            "queue_tech": "Cloud Pub/Sub",
+            "kms_name": "Cloud KMS",
         }
     elif provider == "azure":
         return {
@@ -127,7 +135,11 @@ def get_cloud_specific_terms(provider: str) -> dict:
             "lb_label": "ALB[Azure Application Gateway]",
             "flow_lb": "ALB",
             "shield": "Azure DDoS Protection Plan",
-            "waf": "Azure WAF"
+            "waf": "Azure WAF",
+            "sg_label": "Network Security Groups (NSGs)",
+            "hosting_strategy": "Azure Kubernetes Service (AKS)",
+            "queue_tech": "Service Bus Queue",
+            "kms_name": "Azure Key Vault",
         }
     else:
         # Default: AWS
@@ -140,7 +152,11 @@ def get_cloud_specific_terms(provider: str) -> dict:
             "lb_label": "ALB[AWS Application Load Balancer]",
             "flow_lb": "ALB",
             "shield": "AWS Shield (DDoS Protection)",
-            "waf": "AWS WAF"
+            "waf": "AWS WAF",
+            "sg_label": "Security Groups (SGs)",
+            "hosting_strategy": "AWS EKS",
+            "queue_tech": "AWS SQS",
+            "kms_name": "AWS KMS",
         }
 
 
@@ -271,8 +287,7 @@ def validate_and_format_terraform_code(hcl_content: str) -> str:
 
 async def generate_terraform_code(architecture_markdown: str, provider: str = "aws") -> str:
     """Translate system architecture design into valid, runnable Terraform main.tf code for the target provider."""
-    import asyncio
-    model = get_chat_model(temperature=0.1)
+    model = get_chat_model(temperature=0.1, fast=True)
     prompt = (
         "You are an expert Cloud Infrastructure Engineer and Terraform specialist.\n"
         f"Convert this architecture into a valid Terraform main.tf file using {provider.upper()} provider modules.\n"
@@ -291,6 +306,7 @@ async def generate_terraform_code(architecture_markdown: str, provider: str = "a
     hcl_content = content.strip()
     validated_content = await asyncio.to_thread(validate_and_format_terraform_code, hcl_content)
     return validated_content
+
 
 async def generate_openapi_spec(domain_designs: List[Dict[str, Any]]) -> str:
     """Generate a single valid OpenAPI 3.0.0 YAML specification combining all modules' API endpoints."""
@@ -313,7 +329,7 @@ async def generate_openapi_spec(domain_designs: List[Dict[str, Any]]) -> str:
             for ep in eps:
                 api_summaries.append(f"Module: {module} | Endpoint: {ep}")
 
-    model = get_chat_model(temperature=0.1)
+    model = get_chat_model(temperature=0.1, fast=True)
     prompt = (
         "You are an expert API Architect.\n"
         "Generate a valid OpenAPI 3.0.0 spec in YAML format combining the following API endpoints from all modules.\n"
@@ -331,6 +347,7 @@ async def generate_openapi_spec(domain_designs: List[Dict[str, Any]]) -> str:
         content = re.sub(r"^```[a-zA-Z]*\n", "", content)
         content = re.sub(r"\n```$", "", content)
     return content.strip()
+
 
 _DEVOPS_SYSTEM = (
     "You are an expert DevOps and Release Engineer.\n"
@@ -372,9 +389,10 @@ Output strict JSON with the following structure:
    - Provide clean Deployment and Service resources. Include resource limits, readiness/liveness probes, env variables, and cluster IP / LoadBalancer services.
 """
 
+
 async def generate_devops_pipeline(tech_stack: str, architecture_markdown: str) -> dict:
     """Generate DevOps deployment artifacts (Dockerfile, Docker Compose, CI/CD, Kubernetes)."""
-    model = get_chat_model(temperature=0.1)
+    model = get_chat_model(temperature=0.1, fast=True)
     prompt = _DEVOPS_PROMPT.format(
         TECH_STACK=tech_stack,
         ARCHITECTURE_MARKDOWN=architecture_markdown
@@ -389,11 +407,14 @@ async def generate_devops_pipeline(tech_stack: str, architecture_markdown: str) 
     )
     return devops
 
+
 async def generate_global_architecture(
     domain_designs: List[Dict[str, Any]],
     tech_stack: str = "",
     design_principles: str = "",
-    security_protocols: str = ""
+    security_protocols: str = "",
+    cloud_provider: str = "aws",
+    refinement_instruction: str = ""  # NEW PARAMETER
 ) -> Dict[str, Any]:
     """Combine all module designs into a cohesive, production-grade architecture."""
     parts = []
@@ -410,11 +431,16 @@ async def generate_global_architecture(
         else:
             parts.append(f"- {module}: {len(design.get('api_endpoints', []))} endpoints")
 
-    provider = detect_cloud_provider(tech_stack)
+    provider = (cloud_provider or "").lower().strip()
+    if provider not in ("aws", "gcp", "azure"):
+        provider = detect_cloud_provider(tech_stack)
     terms = get_cloud_specific_terms(provider)
 
+    # Keep the main architecture on the heavy model
     model = get_chat_model(temperature=0.2)
-    response = await model.ainvoke([
+    
+    # 1. Create async tasks for everything that can run in parallel
+    arch_task = asyncio.create_task(model.ainvoke([
         SystemMessage(content=_ARCHITECT_SYSTEM),
         HumanMessage(content=_ARCHITECT_PROMPT.format(
             MODULE_COUNT=len(domain_designs),
@@ -422,6 +448,7 @@ async def generate_global_architecture(
             TECH_STACK=tech_stack or f"Standard modern stack (Python, PostgreSQL, Redis) running on {provider.upper()}",
             DESIGN_PRINCIPLES=design_principles or "Standard microservices/domain-driven design",
             SECURITY_PROTOCOLS=security_protocols or "Standard security protocols (TLS, RBAC, Encryption at Rest)",
+            REFINEMENT_INSTRUCTION=refinement_instruction if refinement_instruction else "No specific refinement requested. Generate the architecture from scratch based on the context.",
             VPC_NAME=terms["vpc"],
             LB_NAME=terms["load_balancer"],
             NAT_NAME=terms["nat_gateway"],
@@ -430,23 +457,38 @@ async def generate_global_architecture(
             LB_LABEL=terms["lb_label"],
             FLOW_LB=terms["flow_lb"],
             SHIELD_NAME=terms["shield"],
-            WAF_NAME=terms["waf"]
+            WAF_NAME=terms["waf"],
+            SG_LABEL=terms["sg_label"],
+            HOSTING_STRATEGY=terms["hosting_strategy"],
+            QUEUE_TECH=terms["queue_tech"],
+            KMS_NAME=terms["kms_name"]
         )),
-    ])
+    ]))
     
-    arch_markdown = response.content.strip()
-    terraform_code = await generate_terraform_code(arch_markdown, provider)
-    openapi_spec = await generate_openapi_spec(domain_designs)
+    # Only re-generate OpenAPI if we are NOT doing a global refinement
+    # (because OpenAPI depends on module schemas, not global architecture)
+    if not refinement_instruction:
+        openapi_task = asyncio.create_task(generate_openapi_spec(domain_designs))
+        arch_response, openapi_spec = await asyncio.gather(arch_task, openapi_task)
+    else:
+        arch_response = await arch_task
+        openapi_spec = None  # Will be filled from cache later
+
+    arch_markdown = arch_response.content.strip()
     
-    devops_artifacts = await generate_devops_pipeline(
+    # 3. Kick off Terraform and DevOps in parallel (they depend on the markdown)
+    terraform_task = asyncio.create_task(generate_terraform_code(arch_markdown, provider))
+    devops_task = asyncio.create_task(generate_devops_pipeline(
         tech_stack=tech_stack or f"Standard modern stack (Python, PostgreSQL, Redis) running on {provider.upper()}",
         architecture_markdown=arch_markdown
-    )
+    ))
+
+    terraform_code, devops_artifacts = await asyncio.gather(terraform_task, devops_task)
     
     return {
         "architecture_markdown": arch_markdown, 
         "terraform_code": terraform_code,
-        "openapi_spec": openapi_spec,
+        "openapi_spec": openapi_spec,  # Might be None if refining
         "devops_artifacts": devops_artifacts,
         "module_count": len(domain_designs)
     }

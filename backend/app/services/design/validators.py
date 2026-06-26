@@ -16,6 +16,7 @@ class DBATable(BaseModel):
     indexes: Optional[List[str]] = []
 
 class DBADraftModel(BaseModel):
+    database_type: Optional[str] = "postgres"
     tables: List[DBATable]
     relationships: Optional[List[str]] = []
 

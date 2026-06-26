@@ -33,6 +33,7 @@ class GraphState(TypedDict):
     design_principles:   str   # e.g. "CQRS, Event Sourcing"
     security_protocols:  str   # e.g. "Row-Level Security, AES-256 at rest"
     open_questions_answers: str # user responses to open questions
+    cloud_provider:      str   # e.g. "aws", "gcp", "azure"
 
 
 class ModuleGraphState(TypedDict):
@@ -63,3 +64,4 @@ class ModuleGraphState(TypedDict):
     design_principles:   str   # e.g. "CQRS, Event Sourcing"
     security_protocols:  str   # e.g. "Row-Level Security, AES-256 at rest"
     open_questions_answers: str # user responses to open questions
+    cloud_provider:      str   # e.g. "aws", "gcp", "azure"

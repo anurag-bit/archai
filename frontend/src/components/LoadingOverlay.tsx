@@ -18,7 +18,7 @@ export function LoadingOverlay({ isGenerating, activeStep }: LoadingOverlayProps
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-950/85 backdrop-blur-md px-4 py-8 animate-fade-in">
-      <div className="max-w-md w-full glass-panel-glow p-8 rounded-3xl text-center flex flex-col items-center gap-6">
+      <div className="max-w-md w-full bg-slate-800/70 backdrop-blur-2xl border border-[var(--accent)] shadow-2xl shadow-[var(--accent-strong)]/5 p-8 rounded-3xl text-center flex flex-col items-center gap-6">
         {/* Animated glowing spinner */}
         <div className="relative w-16 h-16">
           <div className="absolute inset-0 rounded-full border-4 border-slate-850"></div>
@@ -27,7 +27,7 @@ export function LoadingOverlay({ isGenerating, activeStep }: LoadingOverlayProps
         </div>
         
         <div>
-          <h2 className="text-xl font-semibold text-white tracking-tight text-gradient-cyan-indigo text-gradient-glow">Generating System Architecture</h2>
+          <h2 className="text-xl font-semibold bg-gradient-to-r from-[var(--accent-gradient-start)] to-[var(--accent-gradient-end)] bg-clip-text text-transparent tracking-tight drop-shadow-[0_0_15px_rgba(56,189,248,0.25)]">Generating System Architecture</h2>
           <p className="text-xs text-slate-400 mt-1">This typically takes 20-30 seconds depending on LLM mapping</p>
         </div>
 

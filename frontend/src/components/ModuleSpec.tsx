@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { MermaidRenderer } from "@/components/MermaidRenderer";
+import { MarkdownRenderer } from "@/components/MarkdownRenderer";
 
 type DomainDesign = {
   module: string;
@@ -24,6 +25,8 @@ type DomainDesign = {
       test_pyramid?: any;
       load_testing?: any;
     };
+    schema_diff_markdown?: string;
+    schema_diff_mermaid?: string;
     raw_json?: any;
   };
   error?: string;
@@ -420,6 +423,36 @@ export function ModuleSpec({
                 <div className="bg-slate-900/30 border border-white/5 rounded-2xl p-4 overflow-x-auto flex justify-center">
                   <MermaidRenderer chart={activeDesign.design.er_diagram_mermaid} />
                 </div>
+              </div>
+            )}
+
+            {/* Schema Diff Section */}
+            {(activeDesign.design?.schema_diff_markdown || activeDesign.design?.schema_diff_mermaid) && (
+              <div className="space-y-4 border border-emerald-500/20 bg-emerald-500/5 rounded-2xl p-5">
+                <div className="flex items-center justify-between border-b border-emerald-500/10 pb-2">
+                  <h4 className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></span>
+                    Latest Revision Diff (QA / Patch Loop)
+                  </h4>
+                  <span className="text-[10px] text-emerald-300 font-semibold bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
+                    Auto-Tracked
+                  </span>
+                </div>
+
+                {activeDesign.design.schema_diff_markdown && (
+                  <div className="text-xs leading-relaxed text-slate-350 prose prose-invert">
+                    <MarkdownRenderer content={activeDesign.design.schema_diff_markdown} />
+                  </div>
+                )}
+
+                {activeDesign.design.schema_diff_mermaid && (
+                  <div className="space-y-2">
+                    <h5 className="text-[11px] font-bold text-slate-400 uppercase">Diff ER Visualization</h5>
+                    <div className="bg-slate-950/60 border border-white/5 rounded-xl p-4 overflow-x-auto flex justify-center">
+                      <MermaidRenderer chart={activeDesign.design.schema_diff_mermaid} />
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

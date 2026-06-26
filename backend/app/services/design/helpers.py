@@ -6,16 +6,20 @@ import logging
 from typing import List, Dict, Any
 from langchain_openai import ChatOpenAI
 import core.config
+from json_repair import repair_json
 
 logger = logging.getLogger(__name__)
 
-def get_chat_model(temperature: float = 0.0) -> Any:
+def get_chat_model(temperature: float = 0.0, fast: bool = False) -> Any:
     openai_key = os.getenv("OPENAI_API_KEY")
     if not openai_key:
         raise ValueError("OPENAI_API_KEY environment variable is not set")
     
+    # Use a faster, cheaper model for simple JSON/Graph generation
+    model_name = "gpt-4o-mini" if fast else core.config.OPENAI_MODEL
+    
     fallback_model = ChatOpenAI(
-        model=core.config.OPENAI_MODEL,
+        model=model_name,
         temperature=temperature,
         openai_api_key=openai_key,
         request_timeout=120,
@@ -23,11 +27,12 @@ def get_chat_model(temperature: float = 0.0) -> Any:
     
     if core.config.ZAI_API_KEY:
         primary_model = ChatOpenAI(
-            model=core.config.ZAI_MODEL,
+            model=core.config.ZAI_MODEL if not fast else "gpt-4o-mini",
             temperature=temperature,
             openai_api_key=core.config.ZAI_API_KEY,
             openai_api_base=core.config.ZAI_API_BASE,
             request_timeout=120,
+            max_retries=0,
         )
         return primary_model.with_fallbacks([fallback_model])
     
@@ -54,17 +59,18 @@ def parse_llm_json(content: str) -> Dict[str, Any]:
     if content.endswith("```"):
         content = content[:-3]
     
-    # Strip trailing commas right before a closing brace or bracket
-    content_str = re.sub(r',\s*([\]}])', r'\1', content.strip())
+    # Use json_repair to fix common LLM escaping errors before parsing
+    repaired_content = repair_json(content.strip())
     
     try:
-        return json.loads(content_str)
+        # json_repair returns a string, so we still need to json.loads it
+        if isinstance(repaired_content, str):
+            return json.loads(repaired_content)
+        elif isinstance(repaired_content, dict):
+            return repaired_content
     except json.JSONDecodeError:
-        try:
-            return json.loads(content.strip())
-        except json.JSONDecodeError as e:
-            logger.warning(f"⚠️ JSON-DECODE-FAIL: Failed to parse JSON from LLM response ({e}). Returning raw fallback. Content snippet: {content[:200]}...")
-            return {"raw": content}
+        logger.warning(f"⚠️ JSON-DECODE-FAIL: Returning raw fallback. Content snippet: {content[:200]}...")
+        return {"raw": content}
 
 
 def format_chunks_as_context(chunks: List[Dict[str, Any]]) -> str:
@@ -173,9 +179,6 @@ async def invoke_with_retry_and_validation(
     validator=None, 
     max_attempts=3
 ) -> dict:
-    """
-    Invokes the model, parses JSON from the response, validates it, and retries on failure.
-    """
     last_parsed = None
     for attempt in range(max_attempts):
         try:
@@ -188,20 +191,13 @@ async def invoke_with_retry_and_validation(
                 return parsed
             
             logger.warning(
-                f"⚠️ LLM response was not valid JSON on attempt {attempt + 1}. Content snippet: {response.content[:200]}..."
+                f"⚠️ LLM response was not valid JSON on attempt {attempt + 1}."
             )
             last_parsed = parsed
         except Exception as e:
             logger.warning(
                 f"⚠️ Attempt {attempt + 1} failed during LLM invocation or validation: {e}"
             )
-            try:
-                if parsed:
-                    last_parsed = parsed
-                else:
-                    last_parsed = {"raw": response.content}
-            except Exception:
-                last_parsed = {"raw": "Failed to parse content or model failed to respond"}
-                
-    # If all attempts fail, return the last parsed result
+            last_parsed = {"raw": "Failed to parse content or model failed to respond"}
+            
     return last_parsed or {"raw": "Failed all attempts to retrieve valid JSON"}

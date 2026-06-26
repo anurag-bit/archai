@@ -3,7 +3,7 @@ import traceback
 from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, Form, File, UploadFile, HTTPException
 from pydantic import BaseModel
-from services.design import generate_system_design, regenerate_module_design, apply_schema_patch, resume_module_design
+from services.design import generate_system_design, regenerate_module_design, apply_schema_patch, resume_module_design, refine_system_design
 from utils.pdf_parser import extract_pdf_text
 
 router = APIRouter()
@@ -16,6 +16,7 @@ async def design_endpoint(
     design_principles: str = Form(""),
     security_protocols: str = Form(""),
     open_questions_answers: str = Form(""),
+    cloud_provider: str = Form("aws"),
 ):
     try:
         MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
@@ -52,6 +53,7 @@ async def design_endpoint(
             design_principles=design_principles,
             security_protocols=security_protocols,
             open_questions_answers=open_questions_answers,
+            cloud_provider=cloud_provider,
         )
         return result
     except HTTPException:
@@ -118,4 +120,24 @@ async def resume_design_endpoint(document_id: str, req: ResumeDesignRequest):
         raise HTTPException(
             status_code=500,
             detail={"error": "An internal error occurred during design resumption", "requestId": request_id}
+        )
+
+
+class RefineDesignRequest(BaseModel):
+    message: str
+
+
+@router.post("/api/design/{document_id}/refine")
+async def refine_design_endpoint(document_id: str, req: RefineDesignRequest):
+    try:
+        result = await refine_system_design(document_id, req.message)
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        request_id = str(uuid.uuid4())
+        print(f"[Request {request_id}] Refine design error: {traceback.format_exc()}")
+        raise HTTPException(
+            status_code=500,
+            detail={"error": "An internal error occurred during design refinement", "requestId": request_id}
         )

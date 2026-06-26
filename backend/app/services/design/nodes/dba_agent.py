@@ -4,12 +4,17 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from services.design.helpers import get_chat_model, parse_llm_json, invoke_with_retry_and_validation
 from services.design.validators import validate_dba_draft
 from services.design.state import GraphState
+from services.design.nodes.save_module_design import compute_schema_diff
 
 _DBA_SYSTEM = (
     "You are a Principal Database Architect (Schema Architect Agent). "
-    "Your sole job is to produce an exhaustive, production-ready PostgreSQL schema "
-    "grounded STRICTLY in the SRS context provided. "
-    "You MUST design a schema that captures 100% of the capabilities described in the SRS. "
+    "Your job is to choose the most suitable database engine (PostgreSQL, MongoDB, or Neo4j) "
+    "and produce an exhaustive, production-ready schema grounded STRICTLY in the SRS context provided. "
+    "Database Selection Guide:\n"
+    "1. Neo4j: Choose for modules requiring high-read graph structures (e.g. social connections, follower networks, recommendation engines, complex hierarchies).\n"
+    "2. MongoDB: Choose for modules requiring flexible, nested document storage, unstructured metadata, catalogs, or high-write semi-structured logs.\n"
+    "3. PostgreSQL: Choose as the default database engine for all other relational or transactional database requirements.\n"
+    "You MUST design a schema/model that captures 100% of the capabilities described in the SRS. "
     "Do not omit any feature. "
     "Output ONLY valid JSON — no markdown fences, no prose."
 )
@@ -22,11 +27,11 @@ You are designing the "{MODULE_NAME}" module.
 2. EXHAUSTIVE ENUMS — capture exact status values in SQL ENUM or CHECK constraints.
 3. TRACEABILITY — every column must cite the SRS line that requires it in "justification".
 4. BUSINESS RULES — capture exact mathematical or logical constraints.
-5. COMPLETENESS — Generate ALL tables required by the SRS context. A typical module requires 10-20 tables. Do not stop at 5-6 tables. 
+5. COMPLETENESS — Generate ALL tables/collections/nodes required by the SRS context. A typical module requires 10-20 tables. Do not stop at 5-6 tables. 
    - If the SRS describes a workflow, create a table to track its state.
-   - If the SRS describes a sub-entity (e.g., "follow-up actions", "documents", "siblings"), create a table for it.
+   - If the SRS describes a sub-entity (e.g., "follow-up actions", "documents", "siblings"), create a table/collection for it.
 6. SRS MAPPING — Ensure EVERY feature, capability, and workflow described in the SRS context is represented as a table, column, or enum. If a capability is missing, the QA agent will reject the draft.
-7. INDEXES — For any performance index required, you MUST output the explicit DDL string format: 'CREATE INDEX idx_table_column ON table_name(column_name)'. Do not just output the index name.
+7. INDEXES — For any performance index required, you MUST output index definitions compatible with the selected database (e.g. standard SQL index/constraint, Mongo createIndex statement, or Cypher index/constraint query).
 
 {CONSTRAINTS}
 
@@ -48,11 +53,12 @@ When generating the "mermaid_er" string, you MUST follow these rules:
 ### OUTPUT SCHEMA (strict JSON, no extras)
 {{
   "module_name": "{MODULE_NAME}",
-  "compliance_check": "Brief confirmation stating how the Tech Stack, Design Patterns, and Security constraints were applied.",
+  "compliance_check": "Brief confirmation stating how the Tech Stack, Design Patterns, and Security constraints were applied, explaining why the chosen database engine was selected.",
   "business_rules": [
     {{"rule_id": "BR_001", "description": "...", "srs_reference": "..."}}
   ],
   "data_model": {{
+    "database_type": "postgres or mongodb or neo4j",
     "mermaid_er": "erDiagram\\n  ...",
     "tables": [
       {{
@@ -61,7 +67,7 @@ When generating the "mermaid_er" string, you MUST follow these rules:
         "columns": [
           {{"name": "...", "type": "...", "constraints": "...", "justification": "..."}}
         ],
-        "indexes": ["CREATE INDEX idx_table_name_column_name ON table_name(column_name)"]
+        "indexes": ["..."]
       }}
     ]
   }}
@@ -154,7 +160,7 @@ async def dba_agent_node(state: GraphState) -> dict:
     # ── PROGRAMMATIC MERGE — prevents whack-a-mole regressions ───────────────
     # If this is a retry, merge the patched tables into the old complete draft
     # instead of replacing the whole thing (which causes regressions).
-    if retries > 0 and state.get("dba_draft") and "data_model" in new_draft:
+    if (retries > 0 or (feedback and "HUMAN INSTRUCTION" in feedback)) and state.get("dba_draft") and "data_model" in new_draft:
         old_draft  = state["dba_draft"]
         old_tables = old_draft.get("data_model", {}).get("tables", [])
         new_tables = new_draft.get("data_model", {}).get("tables", [])
@@ -174,6 +180,12 @@ async def dba_agent_node(state: GraphState) -> dict:
                 merged_draft["compliance_check"] = new_draft["compliance_check"]
             merged_draft["data_model"] = {**old_draft.get("data_model", {})}
             merged_draft["data_model"]["tables"] = list(tables_dict.values())
+
+            # Compute schema diff
+            db_type = old_draft.get("data_model", {}).get("database_type", "postgres")
+            diff_res = compute_schema_diff(old_tables, list(tables_dict.values()), db_type=db_type)
+            if diff_res.get("markdown"):
+                merged_draft["schema_diff"] = diff_res
 
             # Update business rules if the patch included new ones
             if new_draft.get("business_rules"):
