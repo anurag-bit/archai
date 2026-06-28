@@ -9,6 +9,8 @@ type DomainDesign = {
     api_endpoints?: string[];
     dfd_mermaid?: string;
     component_mermaid?: string;
+    use_flow_mermaid?: string;
+    actor_mermaid?: string;
     frontend_design?: {
       component_tree_mermaid: string;
       state_management: any;
@@ -46,9 +48,7 @@ export function ModuleSelector({
         {domainDesigns.map((d, idx) => {
           const isSelected = idx === selectedModuleIndex;
           const isInterrupted = d.status === "interrupted";
-          const tableCount = isInterrupted
-            ? (d.design?.raw_json?.data_model?.tables?.length || 0)
-            : (d.design?.sql_ddl?.match(/CREATE TABLE/gi) || []).length;
+          const tableCount = d.design?.raw_json?.data_model?.tables?.length || 0;
           const apiCount = d.design?.api_endpoints?.length || 0;
           return (
             <button

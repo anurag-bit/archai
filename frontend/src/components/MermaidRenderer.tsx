@@ -451,7 +451,19 @@ function preprocessMermaidChart(chart: string): string {
   // Fix common LLM shape typos: DB[((Database Store: PostgreSQL)]) -> DB[(Database Store: PostgreSQL)]
   const cleaned = chart.replace(/\[\(\(+/g, "[(").replace(/\)\]\)+/g, ")]");
 
-  let processed = injectTechnologyIcons(cleaned.trim());
+  // Wrap arrow labels containing curly braces or parentheses in double quotes to prevent syntax errors
+  const labelRegex = /\|([^|\r\n]+)\|/g;
+  const withQuotes = cleaned.replace(labelRegex, (match, label) => {
+    const trimmed = label.trim();
+    if ((trimmed.includes("{") || trimmed.includes("}") || trimmed.includes("(") || trimmed.includes(")")) && 
+        !(trimmed.startsWith('"') && trimmed.endsWith('"')) &&
+        !(trimmed.startsWith("'") && trimmed.endsWith("'"))) {
+      return `|"${trimmed.replace(/"/g, '\\"')}"|`;
+    }
+    return match;
+  });
+
+  let processed = injectTechnologyIcons(withQuotes.trim());
 
   if (!processed.includes("erDiagram")) {
     return processed;
@@ -767,8 +779,10 @@ export function MermaidRenderer({ chart }: { chart: string }) {
         if (active) {
           setError(err instanceof Error ? err.message : "Invalid Mermaid Diagram syntax");
         }
-        const badElements = document.querySelectorAll(`[id^="dmermaid-"]`);
-        badElements.forEach((el) => el.remove());
+        const badElement = document.getElementById(`d${renderId}`);
+        if (badElement) {
+          badElement.remove();
+        }
       }
     };
 

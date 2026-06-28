@@ -303,6 +303,8 @@ async def save_module_design_node(state: ModuleGraphState) -> dict:
             "api_endpoints":      api_endpoints,
             "dfd_mermaid":        lld.get("dfd_mermaid", ""),
             "component_mermaid":  lld.get("component_mermaid", ""),
+            "use_flow_mermaid":   lld.get("use_flow_mermaid", ""),
+            "actor_mermaid":      lld.get("actor_mermaid", ""),
             "frontend_design":    frontend,
             "test_strategy":      test_strategy,
             "schema_diff_markdown": dba.get("schema_diff", {}).get("markdown", ""),
@@ -311,6 +313,7 @@ async def save_module_design_node(state: ModuleGraphState) -> dict:
         },
         "selected_chunks": state.get("module_chunks", []),
     }
+
 
     return {
         "module_design": domain_entry

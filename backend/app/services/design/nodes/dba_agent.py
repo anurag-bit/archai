@@ -32,6 +32,7 @@ You are designing the "{MODULE_NAME}" module.
    - If the SRS describes a sub-entity (e.g., "follow-up actions", "documents", "siblings"), create a table/collection for it.
 6. SRS MAPPING — Ensure EVERY feature, capability, and workflow described in the SRS context is represented as a table, column, or enum. If a capability is missing, the QA agent will reject the draft.
 7. INDEXES — For any performance index required, you MUST output index definitions compatible with the selected database (e.g. standard SQL index/constraint, Mongo createIndex statement, or Cypher index/constraint query).
+8. DATABASE ENGINE SELECTION — You MUST choose `mongodb` if the module requires flexible document catalogs, unstructured metadata, or high-write semi-structured logs. You MUST choose `neo4j` if the module requires follower networks, recommendations, or complex hierarchies. Otherwise, default to `postgres`. State your rationale in compliance_check.
 
 {CONSTRAINTS}
 
@@ -100,7 +101,8 @@ async def dba_agent_node(state: GraphState) -> dict:
     # Build constraint block from user-supplied architecture constraints
     constraints_block = "### STRICT ARCHITECTURAL CONSTRAINTS\n"
     if state.get("tech_stack"):
-        constraints_block += f"- TECH STACK: You MUST use {state['tech_stack']}.\n"
+        ts = state['tech_stack']
+        constraints_block += f"- TECH STACK: You MUST use {ts} (However, you may override the database engine and choose MongoDB or Neo4j if specified in the Database Selection Guide for this module's specific needs).\n"
     if state.get("design_principles"):
         constraints_block += f"- DESIGN PATTERNS: You MUST implement {state['design_principles']}.\n"
     if state.get("security_protocols"):

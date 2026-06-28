@@ -73,6 +73,9 @@ class APIDesign(BaseModel):
 class LLDDesign(BaseModel):
     dfd_mermaid: str
     component_mermaid: str
+    use_flow_mermaid: Optional[str] = ""
+    actor_mermaid: Optional[str] = ""
+
 
 # --- Frontend Models ---
 class WireframeDescription(BaseModel):

@@ -11,6 +11,8 @@ type DomainDesign = {
     api_endpoints?: string[];
     dfd_mermaid?: string;
     component_mermaid?: string;
+    use_flow_mermaid?: string;
+    actor_mermaid?: string;
     frontend_design?: {
       component_tree_mermaid: string;
       state_management: any;
@@ -308,6 +310,12 @@ export function ModuleSpec({
       if (activeDesign.design?.component_mermaid) {
         content += `\n\n## Low-Level Component Diagram\n\`\`\`mermaid\n${activeDesign.design.component_mermaid}\n\`\`\``;
       }
+      if (activeDesign.design?.use_flow_mermaid) {
+        content += `\n\n## User Flow Diagram\n\`\`\`mermaid\n${activeDesign.design.use_flow_mermaid}\n\`\`\``;
+      }
+      if (activeDesign.design?.actor_mermaid) {
+        content += `\n\n## User Actor / Use Case Diagram\n\`\`\`mermaid\n${activeDesign.design.actor_mermaid}\n\`\`\``;
+      }
       if (activeDesign.design?.frontend_design) {
         const fd = activeDesign.design.frontend_design;
         content += `\n\n## Frontend Architecture`;
@@ -472,6 +480,26 @@ export function ModuleSpec({
                 <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Low-Level Component Diagram</h4>
                 <div className="bg-slate-900/30 border border-white/5 rounded-2xl p-4 overflow-x-auto flex justify-center">
                   <MermaidRenderer chart={activeDesign.design.component_mermaid} />
+                </div>
+              </div>
+            )}
+
+            {/* User Flow Diagram Section */}
+            {activeDesign.design?.use_flow_mermaid && (
+              <div className="space-y-2.5">
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">User Flow Diagram</h4>
+                <div className="bg-slate-900/30 border border-white/5 rounded-2xl p-4 overflow-x-auto flex justify-center">
+                  <MermaidRenderer chart={activeDesign.design.use_flow_mermaid} />
+                </div>
+              </div>
+            )}
+
+            {/* User Actor / Use Case Diagram Section */}
+            {activeDesign.design?.actor_mermaid && (
+              <div className="space-y-2.5">
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">User Actor / Use Case Diagram</h4>
+                <div className="bg-slate-900/30 border border-white/5 rounded-2xl p-4 overflow-x-auto flex justify-center">
+                  <MermaidRenderer chart={activeDesign.design.actor_mermaid} />
                 </div>
               </div>
             )}

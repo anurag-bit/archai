@@ -216,6 +216,15 @@ def _build_data_model_markdown(domain_designs: List[Dict[str, Any]]) -> str:
             if component_mermaid:
                 lines += ["### Low-Level Component Diagram\n", f"```mermaid\n{component_mermaid}\n```\n"]
 
+            use_flow_mermaid = design.get("use_flow_mermaid", "").strip()
+            if use_flow_mermaid:
+                lines += ["### User Flow Diagram\n", f"```mermaid\n{use_flow_mermaid}\n```\n"]
+
+            actor_mermaid = design.get("actor_mermaid", "").strip()
+            if actor_mermaid:
+                lines += ["### User Actor Diagram\n", f"```mermaid\n{actor_mermaid}\n```\n"]
+
+
             workflows = rich.get("workflows", [])
             if workflows:
                 lines.append("### Workflows\n")
@@ -785,12 +794,15 @@ async def apply_schema_patch(
             "api_endpoints":      api_endpoints,
             "dfd_mermaid":        state["lld_design"].get("dfd_mermaid", ""),
             "component_mermaid":  state["lld_design"].get("component_mermaid", ""),
+            "use_flow_mermaid":   state["lld_design"].get("use_flow_mermaid", ""),
+            "actor_mermaid":      state["lld_design"].get("actor_mermaid", ""),
             "frontend_design":    state.get("frontend_design") or {},
             "test_strategy":      state.get("test_strategy") or {},
             "schema_diff_markdown": merged.get("schema_diff", {}).get("markdown", ""),
             "schema_diff_mermaid":  merged.get("schema_diff", {}).get("mermaid_er", ""),
             "raw_json":           merged,
         },
+
         "selected_chunks": selected_chunks,
     }
 
