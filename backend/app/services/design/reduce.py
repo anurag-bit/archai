@@ -10,7 +10,8 @@ _ARCHITECT_SYSTEM = (
     "Your job is to design a production-grade, highly available, and scalable system architecture "
     "based on the module summaries provided. "
     "You MUST go beyond basic CRUD APIs and design for real-world production concerns: "
-    "caching, asynchronous processing, observability, security, and CI/CD."
+    "caching, asynchronous processing, observability, security, and CI/CD. "
+    "CRITICAL: You must use back-of-the-envelope calculations to justify your architecture decisions."
 )
 
 _ARCHITECT_PROMPT = """\
@@ -23,27 +24,36 @@ The software system consists of the following {MODULE_COUNT} modules:
 - Design Patterns: {DESIGN_PRINCIPLES}
 - Security: {SECURITY_PROTOCOLS}
 
-### HUMAN REFINEMENT INSTRUCTION (CRITICAL)
-{REFINEMENT_INSTRUCTION}
-
 ### YOUR TASK
 Design the comprehensive, production-grade architecture. You MUST output a detailed Markdown document with the following distinct sections. Do not skip any section.
 
-#### 1. High-Level Microservices Architecture Diagram
+#### 0. Capacity Planning & Architecture Decision (CRITICAL)
+Before designing the architecture, perform back-of-the-envelope calculations based on the SRS context. 
+- **User Base:** Estimate Daily Active Users (DAU) and Peak Concurrent Users. State your assumptions.
+- **Traffic Estimation:** Calculate Peak Requests Per Second (RPS). (Assume a user makes 10-20 requests/day, peak traffic = 2x average). Identify Read:Write ratio (e.g., 80:20).
+- **Storage Estimation:** Estimate data generated per user/object. Calculate 1-year and 3-year storage requirements.
+- **Network Bandwidth:** Estimate peak bandwidth in Gbps based on RPS and average payload size.
+- **Architecture Decision:** Based on the calculated scale, complexity, and domain boundaries, explicitly state whether a **Monolithic**, **Modular Monolith**, or **Microservices** architecture is the best fit. 
+  - If RPS < 500 and team is small, strongly consider Modular Monolith.
+  - If RPS > 5000 or domains have vastly different scaling needs, use Microservices.
+  - Provide a 2-sentence rationale for your choice.
+
+#### 1. High-Level System Architecture Diagram
 Generate a Mermaid `graph TD` flowchart showing the complete request lifecycle AND inter-service communication.
 CRITICAL RULES FOR MERMAID:
-- DO NOT use generic labels. You MUST use the technologies specified in the Tech Stack ({TECH_STACK}) to label the nodes (e.g., `Client[Next.js Frontend]`, `Service[Golang Microservice]`).
+- DO NOT use generic labels. You MUST use the technologies specified in the Tech Stack ({TECH_STACK}) to label the nodes.
 - **SECURITY PERIMETER:** You MUST include a Web Application Firewall ({WAF_NAME}) and an API Gateway node. 
 - **AUTH FLOW:** Show the API Gateway validating JWTs against an Auth Service before routing to internal modules.
-- Map out the specific modules generated in Phase 1 as separate nodes.
+- Map out the specific modules generated in Phase 1 as separate nodes (if Microservices) or as internal modules (if Monolith).
 - Use solid lines (`-->`) for synchronous calls and dashed lines (`-.->`) for asynchronous/event-driven communication (Queue).
+- CRITICAL MERMAID SAFETY RULES: ALWAYS wrap node text labels in double quotes. Example: `Client["Next.js Frontend App"]`. ALWAYS define subgraphs with an ID and a quoted title. Example: `subgraph VPC["Cloud Provider VPC"]`.
 
 #### 2. Network Architecture & Topology Diagram (CRITICAL)
 Generate a Mermaid `graph TD` flowchart specifically mapping the Network Topology.
 CRITICAL RULES FOR MERMAID:
 - Use `subgraph` to clearly define network boundaries.
-- Create a `subgraph "{VPC_NAME}"` containing all resources.
-- Inside the network subnet structure, create `subgraph "Public Subnets"` and `subgraph "Private Subnets"`.
+- Create a `subgraph VPC["{VPC_NAME}"]` containing all resources.
+- Inside the network subnet structure, create `subgraph PubSub["Public Subnets"]` and `subgraph PrivSub["Private Subnets"]`.
 - **Public Subnet:** Must contain the {LB_NAME} and {NAT_NAME}.
 - **Private Subnet:** Must contain the Application Nodes ({COMPUTE_LABEL}), the Database (PostgreSQL), and the Cache/Queue (Redis/{QUEUE_TECH}).
 - Show traffic flow: `Internet --> {IGW_NAME} --> {FLOW_LB} --> Private Subnet Nodes`.
@@ -52,15 +62,15 @@ CRITICAL RULES FOR MERMAID:
 
 #### 3. Network Configuration & Routing
 - **VPC & Subnets:** Specify the IP range strategy (e.g., 10.0.0.0/16 VPC, 10.0.1.0/24 Public, 10.0.2.0/24 Private).
-- **Security & Firewall Rules ({SG_LABEL}):** List the specific rules and their inbound/outbound setup (e.g., load balancer allows 443 Inbound from Internet; Application Node allows traffic only from load balancer; Database allows traffic only from Application Node).
+- **Security & Firewall Rules ({SG_LABEL}):** List the specific rules and their inbound/outbound setup.
 - **Routing Tables:** Explain how traffic is routed (Public routes to {IGW_NAME}, Private routes to {NAT_NAME}).
 
 #### 4. Infrastructure & Compute Layer
 - Specify the containerization and hosting strategy (e.g., Docker, {HOSTING_STRATEGY}).
-- Discuss auto-scaling policies based on CPU/Memory/Request count.
+- Discuss auto-scaling policies based on the RPS calculated in Section 0.
 
 #### 5. Data Layer & Caching
-- Specify the primary database setup (e.g., PostgreSQL with Read Replicas).
+- Specify the primary database setup (e.g., PostgreSQL with Read Replicas if Read QPS is high).
 - **Caching Strategy:** Identify which specific modules/tables need caching and specify the technology and invalidation strategy.
 - **Search Engine:** Propose Elasticsearch/OpenSearch if complex querying is needed.
 
@@ -73,7 +83,7 @@ CRITICAL RULES FOR MERMAID:
 You MUST explicitly address how the system enforces the user's specific security protocols: {SECURITY_PROTOCOLS}.
 - **Network Security:** WAF rules (SQLi, XSS), DDoS protection ({SHIELD_NAME}).
 - **Application Security:** Rate Limiting (Redis-backed at API Gateway), Backend Only Abstraction.
-- **Identity & Access Management (IAM):** Detail the RBAC implementation. How are JWT tokens issued, validated, and scoped?
+- **Identity & Access Management (IAM):** Detail the RBAC implementation.
 - **Data Security:** Encryption at rest ({KMS_NAME}) and in transit (TLS 1.3). Column-level encryption for PII.
 
 #### 8. Threat Model & Mitigations (STRIDE)
@@ -89,14 +99,15 @@ Provide a Markdown table mapping the STRIDE threat model to specific architectur
 
 #### 9. Observability (Logging, Monitoring, Tracing)
 - **Centralized Logging:** Propose ELK/Datadog. Specify that auth failures and rate-limit hits MUST be logged.
-- **Metrics & Monitoring:** Prometheus/Grafana alerting thresholds.
-- **Distributed Tracing:** Jaeger/OpenTelemetry for tracing requests across microservices.
+- **Metrics & Monitoring:** Prometheus/Grafana alerting thresholds based on RPS.
+- **Distributed Tracing:** Jaeger/OpenTelemetry for tracing requests across services.
 
 #### 10. CI/CD Pipeline
 - Propose a GitOps workflow (GitHub Actions / GitLab CI).
 - Pipeline stages: Lint -> Test -> Build Docker Image -> Deploy to Staging -> Integration Tests -> Production Deploy.
 - Discuss database migration strategies (e.g., Alembic zero-downtime migrations).
 """
+
 
 def detect_cloud_provider(tech_stack: str) -> str:
     lower = tech_stack.lower() if tech_stack else ""
@@ -414,7 +425,7 @@ async def generate_global_architecture(
     design_principles: str = "",
     security_protocols: str = "",
     cloud_provider: str = "aws",
-    refinement_instruction: str = ""  # NEW PARAMETER
+    refinement_instruction: str = ""  # Make sure this is here if you added it from the previous step
 ) -> Dict[str, Any]:
     """Combine all module designs into a cohesive, production-grade architecture."""
     parts = []
@@ -425,9 +436,7 @@ async def generate_global_architecture(
         if "data_model" in rich:
             table_names    = ", ".join(t["table_name"] for t in rich["data_model"].get("tables", []))
             api_count      = len(rich.get("apis", []))
-            parts.append(
-                f"- {module}: {api_count} endpoints, tables: [{table_names}]"
-            )
+            parts.append(f"- {module}: {api_count} endpoints, tables: [{table_names}]")
         else:
             parts.append(f"- {module}: {len(design.get('api_endpoints', []))} endpoints")
 
@@ -436,47 +445,50 @@ async def generate_global_architecture(
         provider = detect_cloud_provider(tech_stack)
     terms = get_cloud_specific_terms(provider)
 
-    # Keep the main architecture on the heavy model
     model = get_chat_model(temperature=0.2)
     
-    # 1. Create async tasks for everything that can run in parallel
+    # Format prompt with BotE parameters
+    arch_prompt_content = _ARCHITECT_PROMPT.format(
+        MODULE_COUNT=len(domain_designs),
+        MODULE_SUMMARIES="\n".join(parts),
+        TECH_STACK=tech_stack or f"Standard modern stack (Python, PostgreSQL, Redis) running on {provider.upper()}",
+        DESIGN_PRINCIPLES=design_principles or "Standard microservices/domain-driven design",
+        SECURITY_PROTOCOLS=security_protocols or "Standard security protocols (TLS, RBAC, Encryption at Rest)",
+        VPC_NAME=terms["vpc"],
+        LB_NAME=terms["load_balancer"],
+        NAT_NAME=terms["nat_gateway"],
+        IGW_NAME=terms["internet_gateway"],
+        COMPUTE_LABEL=terms["compute_label"],
+        LB_LABEL=terms["lb_label"],
+        FLOW_LB=terms["flow_lb"],
+        SHIELD_NAME=terms["shield"],
+        WAF_NAME=terms["waf"],
+        SG_LABEL=terms["sg_label"],
+        HOSTING_STRATEGY=terms["hosting_strategy"],
+        QUEUE_TECH=terms["queue_tech"],
+        KMS_NAME=terms["kms_name"]
+    )
+
+    # Append refinement instruction if provided
+    if refinement_instruction:
+        arch_prompt_content += f"\n\n### HUMAN REFINEMENT INSTRUCTION (CRITICAL)\n{refinement_instruction}\n"
+    
+    # 1. Create async tasks
     arch_task = asyncio.create_task(model.ainvoke([
         SystemMessage(content=_ARCHITECT_SYSTEM),
-        HumanMessage(content=_ARCHITECT_PROMPT.format(
-            MODULE_COUNT=len(domain_designs),
-            MODULE_SUMMARIES="\n".join(parts),
-            TECH_STACK=tech_stack or f"Standard modern stack (Python, PostgreSQL, Redis) running on {provider.upper()}",
-            DESIGN_PRINCIPLES=design_principles or "Standard microservices/domain-driven design",
-            SECURITY_PROTOCOLS=security_protocols or "Standard security protocols (TLS, RBAC, Encryption at Rest)",
-            REFINEMENT_INSTRUCTION=refinement_instruction if refinement_instruction else "No specific refinement requested. Generate the architecture from scratch based on the context.",
-            VPC_NAME=terms["vpc"],
-            LB_NAME=terms["load_balancer"],
-            NAT_NAME=terms["nat_gateway"],
-            IGW_NAME=terms["internet_gateway"],
-            COMPUTE_LABEL=terms["compute_label"],
-            LB_LABEL=terms["lb_label"],
-            FLOW_LB=terms["flow_lb"],
-            SHIELD_NAME=terms["shield"],
-            WAF_NAME=terms["waf"],
-            SG_LABEL=terms["sg_label"],
-            HOSTING_STRATEGY=terms["hosting_strategy"],
-            QUEUE_TECH=terms["queue_tech"],
-            KMS_NAME=terms["kms_name"]
-        )),
+        HumanMessage(content=arch_prompt_content)
     ]))
     
-    # Only re-generate OpenAPI if we are NOT doing a global refinement
-    # (because OpenAPI depends on module schemas, not global architecture)
     if not refinement_instruction:
         openapi_task = asyncio.create_task(generate_openapi_spec(domain_designs))
         arch_response, openapi_spec = await asyncio.gather(arch_task, openapi_task)
     else:
         arch_response = await arch_task
-        openapi_spec = None  # Will be filled from cache later
+        openapi_spec = None
 
     arch_markdown = arch_response.content.strip()
     
-    # 3. Kick off Terraform and DevOps in parallel (they depend on the markdown)
+    # 3. Kick off Terraform and DevOps in parallel
     terraform_task = asyncio.create_task(generate_terraform_code(arch_markdown, provider))
     devops_task = asyncio.create_task(generate_devops_pipeline(
         tech_stack=tech_stack or f"Standard modern stack (Python, PostgreSQL, Redis) running on {provider.upper()}",
@@ -488,7 +500,7 @@ async def generate_global_architecture(
     return {
         "architecture_markdown": arch_markdown, 
         "terraform_code": terraform_code,
-        "openapi_spec": openapi_spec,  # Might be None if refining
+        "openapi_spec": openapi_spec,
         "devops_artifacts": devops_artifacts,
         "module_count": len(domain_designs)
     }

@@ -746,11 +746,11 @@ export function MermaidRenderer({ chart }: { chart: string }) {
     if (!containerRef.current || !chart) return;
 
     const renderChart = async () => {
+      const renderId = `mermaid-${Math.random().toString(36).substring(2, 9)}`;
       try {
         setError(null);
         reinitializeMermaid();
         const cleanChart = preprocessMermaidChart(chart);
-        const renderId = `mermaid-${Math.random().toString(36).substring(2, 9)}`;
         const { svg } = await serializedRender(renderId, cleanChart);
         
         if (active && containerRef.current) {
