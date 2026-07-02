@@ -1,0 +1,12 @@
+node_modules/
+.next/
+.env
+.env.local
+out/
+pnpm-lock.yaml
+pnpm-workspace.yaml
+*.log
+.git
+.gitignore
+.dockerignore
+Dockerfile
