@@ -1154,32 +1154,44 @@ async def refine_system_design(
             domain_designs[i] = new_design
             break
 
-    # Re-generate global architecture and PM plan (since a module design changed)
-    arch_task = generate_global_architecture(
-        domain_designs,
-        tech_stack=tech_stack,
-        design_principles=design_principles,
-        security_protocols=security_protocols,
-        cloud_provider=cloud_provider
-    )
-    pm_task = generate_pm_plan(
-        domain_designs,
-        tech_stack=tech_stack,
-        design_principles=design_principles,
-        security_protocols=security_protocols
-    )
-    arch_res, pm_res = await asyncio.gather(arch_task, pm_task)
-
-    # Update cache values
+    # Update cache values immediately (re-using old global values so that return is fast)
     cached_result["domainDesigns"] = domain_designs
     cached_result["dataModelMarkdown"] = _build_data_model_markdown(domain_designs)
-    cached_result["systemDesignMarkdown"] = arch_res["architecture_markdown"]
-    cached_result["terraformCode"] = arch_res["terraform_code"]
-    cached_result["openapiSpec"] = arch_res.get("openapi_spec", "")
-    cached_result["devopsArtifacts"] = arch_res.get("devops_artifacts", {})
-    cached_result["projectPlan"] = pm_res
     cached_result["generatedAt"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-
     set_cached_design(document_id, cached_result)
+
+    # Re-generate global architecture and PM plan in the background asynchronously
+    async def bg_update_global_artifacts():
+        try:
+            logger.info(f"[refine-bg] Starting background global architecture & PM plan update for {document_id}...")
+            arch_res = await generate_global_architecture(
+                domain_designs,
+                tech_stack=tech_stack,
+                design_principles=design_principles,
+                security_protocols=security_protocols,
+                cloud_provider=cloud_provider
+            )
+            pm_res = await generate_pm_plan(
+                domain_designs,
+                tech_stack=tech_stack,
+                design_principles=design_principles,
+                security_protocols=security_protocols
+            )
+            
+            # Read latest cache state, merge new global values, and save
+            latest = get_cached_design(document_id)
+            if latest:
+                latest["systemDesignMarkdown"] = arch_res["architecture_markdown"]
+                latest["terraformCode"] = arch_res["terraform_code"]
+                latest["openapiSpec"] = arch_res.get("openapi_spec", "")
+                latest["devopsArtifacts"] = arch_res.get("devops_artifacts", {})
+                latest["projectPlan"] = pm_res
+                set_cached_design(document_id, latest)
+                logger.info(f"[refine-bg] ✓ Background global architecture & PM plan updated successfully for {document_id}")
+        except Exception as bg_err:
+            logger.error(f"[refine-bg] Error in background global update: {bg_err}", exc_info=True)
+
+    # Spawn background task on the event loop
+    asyncio.create_task(bg_update_global_artifacts())
 
     return cached_result
