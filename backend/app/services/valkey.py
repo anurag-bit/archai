@@ -87,70 +87,89 @@ def set_cached_design(document_id: str, data: dict):
 
 
 from langgraph.checkpoint.base import BaseCheckpointSaver
-from langgraph.checkpoint.redis import RedisSaver
+from langgraph.checkpoint.redis import RedisSaver, AsyncRedisSaver
 from langgraph.checkpoint.memory import MemorySaver
 
 class DynamicSaver(BaseCheckpointSaver):
     """
-    A LangGraph checkpoint saver that attempts to connect to Valkey/Redis
-    and falls back to MemorySaver if Valkey is unreachable.
+    A LangGraph checkpoint saver that dynamically delegates to AsyncRedisSaver
+    for async methods and RedisSaver for sync methods when online,
+    falling back to MemorySaver when Valkey is unreachable.
     """
     def __init__(self, valkey_url: str):
         super().__init__()
         self.valkey_url = valkey_url
         self.memory_saver = MemorySaver()
-        self._redis_saver = None
+        self._sync_redis_saver = None
+        self._async_redis_saver = None
         self._is_redis_dead = False
         
     @property
-    def redis_saver(self):
+    def sync_saver(self):
         if self._is_redis_dead:
             return self.memory_saver
-        if self._redis_saver is None:
+        if self._sync_redis_saver is None:
             try:
                 # Test connectivity
                 client = redis.Redis.from_url(self.valkey_url, socket_connect_timeout=2)
                 client.ping()
-                self._redis_saver = RedisSaver(redis_url=self.valkey_url)
-                logger.info(f"Successfully initialized persistent Valkey checkpointer at {self.valkey_url}")
+                self._sync_redis_saver = RedisSaver(redis_url=self.valkey_url)
+                logger.info(f"Successfully initialized sync persistent Valkey checkpointer at {self.valkey_url}")
             except Exception as e:
-                logger.warning(f"Valkey unreachable for checkpointer saver ({e}). Falling back to memory-based checkpointer.")
+                logger.warning(f"Valkey unreachable for sync checkpointer saver ({e}). Falling back to memory-based checkpointer.")
                 self._is_redis_dead = True
                 return self.memory_saver
-        return self._redis_saver
+        return self._sync_redis_saver
+
+    @property
+    def async_saver(self):
+        if self._is_redis_dead:
+            return self.memory_saver
+        if self._async_redis_saver is None:
+            try:
+                # Test connectivity
+                client = redis.Redis.from_url(self.valkey_url, socket_connect_timeout=2)
+                client.ping()
+                self._async_redis_saver = AsyncRedisSaver(redis_url=self.valkey_url)
+                logger.info(f"Successfully initialized async persistent Valkey checkpointer at {self.valkey_url}")
+            except Exception as e:
+                logger.warning(f"Valkey unreachable for async checkpointer saver ({e}). Falling back to memory-based checkpointer.")
+                self._is_redis_dead = True
+                return self.memory_saver
+        return self._async_redis_saver
 
     def get_tuple(self, config):
-        return self.redis_saver.get_tuple(config)
+        return self.sync_saver.get_tuple(config)
 
     def put(self, config, checkpoint, metadata, new_versions):
-        return self.redis_saver.put(config, checkpoint, metadata, new_versions)
+        return self.sync_saver.put(config, checkpoint, metadata, new_versions)
 
     def put_writes(self, config, writes, task_id, task_path=""):
-        return self.redis_saver.put_writes(config, writes, task_id, task_path)
+        return self.sync_saver.put_writes(config, writes, task_id, task_path)
 
     def list(self, config, *, filter=None, before=None, limit=None):
-        return self.redis_saver.list(config, filter=filter, before=before, limit=limit)
+        return self.sync_saver.list(config, filter=filter, before=before, limit=limit)
 
     async def aget_tuple(self, config):
-        saver = self.redis_saver
+        saver = self.async_saver
         if isinstance(saver, MemorySaver):
             return saver.get_tuple(config)
         return await saver.aget_tuple(config)
 
     async def aput(self, config, checkpoint, metadata, new_versions):
-        saver = self.redis_saver
+        saver = self.async_saver
         if isinstance(saver, MemorySaver):
             return saver.put(config, checkpoint, metadata, new_versions)
         return await saver.aput(config, checkpoint, metadata, new_versions)
 
     async def aput_writes(self, config, writes, task_id, task_path=""):
-        saver = self.redis_saver
+        saver = self.async_saver
         if isinstance(saver, MemorySaver):
             return saver.put_writes(config, writes, task_id, task_path)
         return await saver.aput_writes(config, writes, task_id, task_path)
 
     async def alist(self, config, *, filter=None, before=None, limit=None):
-        saver = self.redis_saver
+        saver = self.async_saver
         if isinstance(saver, MemorySaver):
             for x in saver.list(config, filter=filter, before=before, limit=limit):
                 yield x
