@@ -163,10 +163,11 @@ def _build_data_model_markdown(domain_designs: List[Dict[str, Any]]) -> str:
                                 "|--------|------|-------------|---------------|",
                             ]
                         for col in cols:
+                            justification = col.get('justification', '').replace('|', '\\|')
                             lines.append(
                                 f"| `{col.get('name','')}` | `{col.get('type','')}` "
                                 f"| {col.get('constraints','')} "
-                                f"| {col.get('justification','').replace('|','\\|')} |"
+                                f"| {justification} |"
                             )
                         lines.append("")
                     idxs = tbl.get("indexes", [])
@@ -186,9 +187,10 @@ def _build_data_model_markdown(domain_designs: List[Dict[str, Any]]) -> str:
                     "|---------|-------------|---------------|",
                 ]
                 for rule in rules:
+                    description = rule.get('description', '').replace('|', '\\|')
                     lines.append(
                         f"| {rule.get('rule_id','')} "
-                        f"| {rule.get('description','').replace('|','\\|')} "
+                        f"| {description} "
                         f"| {rule.get('srs_reference','')} |"
                     )
                 lines.append("")
@@ -201,9 +203,11 @@ def _build_data_model_markdown(domain_designs: List[Dict[str, Any]]) -> str:
                     "|--------|------|-------------|---------------|",
                 ]
                 for api in apis:
+                    description = api.get('description', '').replace('|', '\\|')
                     lines.append(
-                        f"| `{api.get('method','')}` | `{api.get('path','')}` "
-                        f"| {api.get('description','').replace('|','\\|')} "
+                        f"| `{api.get('method','')}` "
+                        f"| `{api.get('path','')}` "
+                        f"| {description} "
                         f"| {api.get('srs_reference','')} |"
                     )
                 lines.append("")
@@ -243,9 +247,11 @@ def _build_data_model_markdown(domain_designs: List[Dict[str, Any]]) -> str:
                             "|------|----|---------|--------------|",
                         ]
                         for tr in transitions:
+                            trigger = tr.get('trigger', '').replace('|', '\\|')
                             lines.append(
-                                f"| `{tr.get('from','')}` | `{tr.get('to','')}` "
-                                f"| {tr.get('trigger','').replace('|','\\|')} "
+                                f"| `{tr.get('from','')}` "
+                                f"| `{tr.get('to','')}` "
+                                f"| {trigger} "
                                 f"| `{tr.get('api_endpoint','')}` |"
                             )
                         lines.append("")
