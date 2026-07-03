@@ -23,7 +23,13 @@ def get_embeddings() -> Embeddings:
                     _embeddings = OpenAIEmbeddings(
                         openai_api_key=config.OPENROUTER_API_KEY,
                         openai_api_base=config.OPENROUTER_API_BASE,
-                        model="nvidia/llama-nemotron-embed-vl-1b-v2:free"
+                        model="nvidia/llama-nemotron-embed-vl-1b-v2:free",
+                        default_headers={
+                            "HTTP-Referer": "http://localhost:3000",
+                            "X-Title": "Archai"
+                        },
+                        model_kwargs={"encoding_format": "float"},
+                        check_embedding_ctx_length=False
                     )
                 else:
                     from services.embeddings import LocalHuggingFaceEmbeddings
