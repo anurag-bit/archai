@@ -10,6 +10,9 @@ logger = logging.getLogger(__name__)
 
 
 
+import json
+from fastapi.responses import StreamingResponse
+
 router = APIRouter()
 
 @router.post("/api/design")
@@ -51,15 +54,23 @@ async def design_endpoint(
                 detail="Add a requirements document or paste requirement text before generating."
             )
 
-        result = await generate_system_design(
-            document_text,
-            tech_stack=tech_stack,
-            design_principles=design_principles,
-            security_protocols=security_protocols,
-            open_questions_answers=open_questions_answers,
-            cloud_provider=cloud_provider,
-        )
-        return result
+        async def event_generator():
+            try:
+                async for event in generate_system_design(
+                    document_text,
+                    tech_stack=tech_stack,
+                    design_principles=design_principles,
+                    security_protocols=security_protocols,
+                    open_questions_answers=open_questions_answers,
+                    cloud_provider=cloud_provider,
+                ):
+                    yield f"data: {json.dumps(event)}\n\n"
+            except Exception as e:
+                logger.error(f"SSE stream error: {e}")
+                err_payload = {"phase": "done", "status": "error", "error": str(e)}
+                yield f"data: {json.dumps(err_payload)}\n\n"
+
+        return StreamingResponse(event_generator(), media_type="text/event-stream")
     except HTTPException:
         raise
     except Exception as e:

@@ -11,3 +11,5 @@ sentence-transformers
 langchain-huggingface
 langgraph
 json-repair
+redis
+langgraph-checkpoint-redis

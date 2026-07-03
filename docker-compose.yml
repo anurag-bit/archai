@@ -10,6 +10,12 @@ services:
       - chroma-data:/chroma/chroma
     restart: unless-stopped
 
+  valkey:
+    image: valkey/valkey:latest
+    ports:
+      - "6383:6379"
+    restart: unless-stopped
+
   backend:
     build:
       context: ./backend
@@ -24,8 +30,11 @@ services:
       - CHROMA_COLLECTION=documents
       - PORT=8080
       - ENVIRONMENT=production
+      - VALKEY_HOST=valkey
+      - VALKEY_PORT=6379
     depends_on:
       - chroma
+      - valkey
     restart: unless-stopped
 
   frontend:

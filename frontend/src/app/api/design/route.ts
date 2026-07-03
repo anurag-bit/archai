@@ -43,8 +43,35 @@ export async function POST(request: Request) {
       }
     }
 
-    const data = await response.json();
-    return NextResponse.json(data);
+    // Stream the backend response back to the client
+    const stream = new ReadableStream({
+      async start(controller) {
+        if (!response.body) {
+          controller.close();
+          return;
+        }
+        const reader = response.body.getReader();
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            controller.enqueue(value);
+          }
+        } catch (e) {
+          controller.error(e);
+        } finally {
+          controller.close();
+        }
+      }
+    });
+
+    return new NextResponse(stream, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+      }
+    });
   } catch (error: any) {
     console.error("Proxy error in /api/design:", error);
     return NextResponse.json(
