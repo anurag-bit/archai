@@ -10,3 +10,4 @@ pydantic
 sentence-transformers
 langchain-huggingface
 langgraph
+json-repair
