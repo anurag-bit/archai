@@ -5,7 +5,14 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # App environment configuration
+ENVIRONMENT = os.getenv("ENVIRONMENT", "local")
 PORT = int(os.getenv("PORT", "8080"))
+
+# OpenRouter configuration
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+OPENROUTER_API_BASE = os.getenv("OPENROUTER_API_BASE", "https://openrouter.ai/api/v1")
+OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "nvidia/nemotron-3-ultra-550b-a55b:free")
+
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 

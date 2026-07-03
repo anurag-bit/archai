@@ -23,6 +23,7 @@ services:
       - CHROMA_PORT=8000
       - CHROMA_COLLECTION=documents
       - PORT=8080
+      - ENVIRONMENT=production
     depends_on:
       - chroma
     restart: unless-stopped
