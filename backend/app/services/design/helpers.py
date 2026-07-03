@@ -17,15 +17,28 @@ def get_chat_model(temperature: float = 0.0, fast: bool = False) -> Any:
             raise ValueError("OPENROUTER_API_KEY environment variable is not set")
         
         # Use a faster, cheaper model for simple JSON/Graph generation
-        model_name = "google/gemini-2.5-flash" if fast else core.config.OPENROUTER_MODEL
+        model_name = "google/gemini-2.0-flash-exp:free" if fast else core.config.OPENROUTER_MODEL
         
-        return ChatOpenAI(
+        primary_model = ChatOpenAI(
             model=model_name,
             temperature=temperature,
             openai_api_key=api_key,
             openai_api_base=core.config.OPENROUTER_API_BASE,
             request_timeout=120,
+            max_retries=5,
         )
+        
+        # Free models on OpenRouter often hit rate limits. Add a fallback!
+        fallback_model = ChatOpenAI(
+            model="google/gemini-2.0-flash-exp:free",
+            temperature=temperature,
+            openai_api_key=api_key,
+            openai_api_base=core.config.OPENROUTER_API_BASE,
+            request_timeout=120,
+            max_retries=3,
+        )
+        
+        return primary_model.with_fallbacks([fallback_model])
     else:
         openai_key = os.getenv("OPENAI_API_KEY")
         
