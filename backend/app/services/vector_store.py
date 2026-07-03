@@ -3,7 +3,7 @@ import time
 import chromadb
 import threading
 from typing import List, Dict, Any, Tuple, Optional
-from services.embeddings import LocalHuggingFaceEmbeddings
+from langchain_core.embeddings import Embeddings
 from langchain_core.documents import Document
 
 # Global cache variables
@@ -12,12 +12,22 @@ _chroma_client = None
 _lock = threading.Lock()
 _shutdown_event = threading.Event()
 
-def get_embeddings() -> LocalHuggingFaceEmbeddings:
+def get_embeddings() -> Embeddings:
     global _embeddings
     if _embeddings is None:
         with _lock:
             if _embeddings is None:
-                _embeddings = LocalHuggingFaceEmbeddings()
+                from core import config
+                if config.ENVIRONMENT == "production":
+                    from langchain_openai import OpenAIEmbeddings
+                    _embeddings = OpenAIEmbeddings(
+                        openai_api_key=config.OPENROUTER_API_KEY,
+                        openai_api_base=config.OPENROUTER_API_BASE,
+                        model="nvidia/llama-nemotron-embed-vl-1b-v2:free"
+                    )
+                else:
+                    from services.embeddings import LocalHuggingFaceEmbeddings
+                    _embeddings = LocalHuggingFaceEmbeddings()
     return _embeddings
 
 def get_chroma_client() -> chromadb.HttpClient:
