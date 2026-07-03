@@ -10,48 +10,33 @@ from json_repair import repair_json
 
 logger = logging.getLogger(__name__)
 
-def get_chat_model(temperature: float = 0.0, fast: bool = False) -> Any:
+MODEL_TIERS = {
+    "fast": "gpt-4o-mini",          # LLD, Frontend, QA, PM summaries, OpenAPI, Terraform
+    "standard": "gpt-4o",           # DBA (needs precision), API design
+    "heavy": "o3-mini",             # Only if you need deep reasoning (skip for now)
+}
+
+def get_chat_model(temperature: float = 0.05, fast: bool = False) -> Any:
+    tier = "fast" if fast else "standard"
+    base_model_name = MODEL_TIERS[tier]
+    
     if core.config.ENVIRONMENT == "production":
-        api_key = core.config.OPENROUTER_API_KEY
+        api_key = os.getenv("OPENAI_API_KEY")
         if not api_key:
-            raise ValueError("OPENROUTER_API_KEY environment variable is not set")
-        
-        # Use a faster, cheaper model for simple JSON/Graph generation
-        model_name = "google/gemini-2.0-flash-exp:free" if fast else core.config.OPENROUTER_MODEL
+            raise ValueError("OPENAI_API_KEY environment variable is not set")
         
         primary_model = ChatOpenAI(
-            model=model_name,
+            model=base_model_name,
             temperature=temperature,
             openai_api_key=api_key,
-            openai_api_base=core.config.OPENROUTER_API_BASE,
             request_timeout=120,
-            max_retries=5,
-            default_headers={
-                "HTTP-Referer": "http://localhost:3000",
-                "X-Title": "Archai"
-            }
+            max_retries=5
         )
-        
-        # Free models on OpenRouter often hit rate limits. Add a fallback!
-        fallback_model = ChatOpenAI(
-            model="google/gemini-2.0-flash-exp:free",
-            temperature=temperature,
-            openai_api_key=api_key,
-            openai_api_base=core.config.OPENROUTER_API_BASE,
-            request_timeout=120,
-            max_retries=3,
-            default_headers={
-                "HTTP-Referer": "http://localhost:3000",
-                "X-Title": "Archai"
-            }
-        )
-        
-        return primary_model.with_fallbacks([fallback_model])
+        return primary_model
     else:
         openai_key = os.getenv("OPENAI_API_KEY")
         
-        # Use a faster, cheaper model for simple JSON/Graph generation
-        model_name = "gpt-4o-mini" if fast else core.config.OPENAI_MODEL
+        model_name = base_model_name
         
         fallback_model = None
         if openai_key:

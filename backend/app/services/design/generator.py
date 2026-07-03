@@ -6,7 +6,7 @@ import json
 import asyncio
 from typing import List, Dict, Any, Optional
 from langgraph.graph import StateGraph, END
-from langgraph.checkpoint.memory import MemorySaver
+
 
 from services.vector_store import (
     index_chunks_to_chroma,
@@ -89,24 +89,34 @@ def _build_module_graph() -> StateGraph:
         }
     )
 
-    # Fixed edges
+    # Sequential dependencies
     graph.add_edge("fetch_context",  "dba_agent")
     graph.add_edge("dba_agent",      "api_agent")
+    
+    # ── FAN-OUT: these three run concurrently ──
     graph.add_edge("api_agent",      "qa_agent")
-    graph.add_edge("qa_agent",       "lld_agent")
-    graph.add_edge("lld_agent",      "frontend_agent")
+    graph.add_edge("api_agent",      "lld_agent")
+    graph.add_edge("api_agent",      "frontend_agent")
+    
+    # ── FAN-IN: wait for all three, then save ──
+    graph.add_edge("qa_agent",       "save_module_design")
+    graph.add_edge("lld_agent",      "save_module_design")
     graph.add_edge("frontend_agent", "save_module_design")
+    
     graph.add_edge("save_module_design", END)
 
     return graph
 
 
-# Initialize checkpointer memory saver
-memory = MemorySaver()
+# Initialize persistent checkpointer dynamic saver using Valkey (DB 1)
+from services.valkey import DynamicSaver
+checkpointer = DynamicSaver(
+    valkey_url=f"redis://{core.config.VALKEY_HOST}:{core.config.VALKEY_PORT}/1"
+)
 
 # Compiled app
 _module_workflow_app = _build_module_graph().compile(
-    checkpointer=memory
+    checkpointer=checkpointer
 )
 
 # ─────────────────────────── Markdown renderer ───────────────────────────────
@@ -313,16 +323,9 @@ async def generate_system_design(
     security_protocols: str = "",
     open_questions_answers: str = "",
     cloud_provider: str = "aws",
-) -> Dict[str, Any]:
+):
     """
-    Main entry point called by the FastAPI /api/design route.
-
-    1. Normalises the document and computes a stable document_id.
-    2. Checks a local JSON cache; returns it immediately on a hit.
-    3. Indexes the document into Chroma.
-    4. Runs the LangGraph MAS workflow for every module.
-    5. Runs the global architecture reduce step.
-    6. Writes the result to the cache and returns it.
+    Main entry point called by the FastAPI /api/design route. Streams progress events using SSE.
     """
     normalized  = normalize_text(document_text)
     cache_input = f"{normalized}||{tech_stack.strip()}||{design_principles.strip()}||{security_protocols.strip()}||{open_questions_answers.strip()}||{cloud_provider.strip()}"
@@ -330,22 +333,16 @@ async def generate_system_design(
     request_id  = str(uuid.uuid4())
 
     # ── Cache lookup ────────────────────────────────────────────────────────
-    cache_dir  = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "cache")
-    os.makedirs(cache_dir, exist_ok=True)
-    cache_path = os.path.join(cache_dir, f"{document_id}.json")
-
-    if os.path.exists(cache_path):
-        try:
-            with open(cache_path, "r", encoding="utf-8") as f:
-                cached = json.load(f)
-            cached["generatedAt"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-            logger.info(f"✓ Returning cached design for document: {document_id}")
-            return cached
-        except Exception as e:
-            logger.error(f"Cache read failed for {document_id}: {e}")
+    from services.valkey import get_cached_design, set_cached_design
+    cached = get_cached_design(document_id)
+    if cached:
+        cached["generatedAt"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+        yield {"phase": "done", "status": "complete", "data": cached}
+        return
 
     try:
         # ── Index chunks using REGEX only (no LLM call here!) ──────────────
+        yield {"phase": "extraction", "status": "started"}
         logger.info("Indexing document chunks into Chroma...")
         prelim_modules = re.findall(
             r'\d+\.\s*Module\s*Name\s*-\s*([^\n]+)', normalized, re.IGNORECASE
@@ -360,56 +357,115 @@ async def generate_system_design(
         # Build a combined constraints string for the extractor
         extractor_constraints = f"Tech Stack: {tech_stack}\nDesign: {design_principles}\nSecurity: {security_protocols}"
         modules = await extract_modules(normalized, constraints=extractor_constraints)
+        yield {"phase": "extraction", "status": "complete", "data": {"modules": modules, "count": len(modules)}}
 
         sem = asyncio.Semaphore(MAX_CONCURRENT_MODULES)
         logger.info(f"Executing module designs in parallel (concurrency limit: {MAX_CONCURRENT_MODULES})...")
 
-        async def run_module_workflow(module_name: str) -> Dict[str, Any]:
-            async with sem:
-                initial_state: ModuleGraphState = {
-                    "normalized_text": normalized,
-                    "document_id":     document_id,
-                    "request_id":      request_id,
-                    "current_module":  module_name,
-                    "module_context":  "",
-                    "module_chunks":   [],
-                    "dba_draft":       {},
-                    "qa_feedback":     "",
-                    "qa_retries":      0,
-                    "api_design":      {},
-                    "lld_design":      {},
-                    "frontend_design": {},
-                    "test_strategy":   {},
-                    "module_design":   None,
-                    # Architecture constraints
-                    "tech_stack":          tech_stack,
-                    "design_principles":   design_principles,
-                    "security_protocols":  security_protocols,
-                    "open_questions_answers": open_questions_answers,
-                    "cloud_provider":      cloud_provider,
-                }
-                config = {"configurable": {"thread_id": f"{document_id}_{module_name}"}}
-                final_state = await _module_workflow_app.ainvoke(initial_state, config)
-                return final_state
+        queue = asyncio.Queue()
+        active_tasks = len(modules)
 
-        tasks = [run_module_workflow(m) for m in modules]
-        final_states = await asyncio.gather(*tasks)
-        
+        async def run_module_workflow(module_name: str):
+            nonlocal active_tasks
+            try:
+                async with sem:
+                    initial_state: ModuleGraphState = {
+                        "normalized_text": normalized,
+                        "document_id":     document_id,
+                        "request_id":      request_id,
+                        "current_module":  module_name,
+                        "module_context":  "",
+                        "module_chunks":   [],
+                        "dba_draft":       {},
+                        "qa_feedback":     "",
+                        "qa_retries":      0,
+                        "api_design":      {},
+                        "lld_design":      {},
+                        "frontend_design": {},
+                        "test_strategy":   {},
+                        "module_design":   None,
+                        # Architecture constraints
+                        "tech_stack":          tech_stack,
+                        "design_principles":   design_principles,
+                        "security_protocols":  security_protocols,
+                        "open_questions_answers": open_questions_answers,
+                        "cloud_provider":      cloud_provider,
+                    }
+                    config = {"configurable": {"thread_id": f"{document_id}_{module_name}"}}
+                    
+                    # Stream updates at the node level
+                    async for chunk in _module_workflow_app.astream(initial_state, config, stream_mode="updates"):
+                        for node_name in chunk.keys():
+                            await queue.put({
+                                "phase": "module_node",
+                                "status": "complete",
+                                "data": {
+                                    "module": module_name,
+                                    "node": node_name
+                                }
+                            })
+                    
+                    # Graph finished, retrieve final state from checkpointer
+                    final_state = await _module_workflow_app.get_state(config)
+                    design = final_state.values.get("module_design")
+                    
+                    if design:
+                        await queue.put({
+                            "phase": "module",
+                            "status": "complete",
+                            "data": design
+                        })
+                    else:
+                        await queue.put({
+                            "phase": "module",
+                            "status": "interrupted",
+                            "data": {
+                                "module_name": module_name,
+                                "dba_draft": final_state.values.get("dba_draft"),
+                                "qa_feedback": final_state.values.get("qa_feedback")
+                            }
+                        })
+            except Exception as e:
+                logger.error(f"Error in module workflow for '{module_name}': {e}")
+                await queue.put({
+                    "phase": "module",
+                    "status": "interrupted",
+                    "data": {
+                        "module_name": module_name,
+                        "dba_draft": {},
+                        "qa_feedback": f"Execution error: {str(e)}"
+                    }
+                })
+            finally:
+                active_tasks -= 1
+                if active_tasks == 0:
+                    await queue.put(None) # Sentinel to stop reading the queue
+
+        # Start tasks concurrently
+        for m in modules:
+            asyncio.create_task(run_module_workflow(m))
+
         domain_designs = []
         interrupted_modules = []
         interrupted_details = {}
-        
-        for state in final_states:
-            m = state.get("current_module")
-            design = state.get("module_design")
-            if design:
-                domain_designs.append(design)
-            else:
-                interrupted_modules.append(m)
-                interrupted_details[m] = {
-                    "dba_draft": state.get("dba_draft"),
-                    "qa_feedback": state.get("qa_feedback"),
-                }
+
+        while True:
+            event = await queue.get()
+            if event is None:
+                break
+            
+            if event["phase"] == "module":
+                m = event["data"]["module"] if "module" in event["data"] else event["data"]["module_name"]
+                if event["status"] == "complete":
+                    domain_designs.append(event["data"])
+                elif event["status"] == "interrupted":
+                    interrupted_modules.append(m)
+                    interrupted_details[m] = {
+                        "dba_draft": event["data"].get("dba_draft", {}),
+                        "qa_feedback": event["data"].get("qa_feedback", "")
+                    }
+            
+            yield event
         
         logger.info(f"LangGraph workflow complete. {len(domain_designs)} completed, {len(interrupted_modules)} interrupted.")
 
@@ -455,31 +511,33 @@ async def generate_system_design(
                 "openQuestionsAnswers": open_questions_answers,
                 "cloudProvider":        cloud_provider,
             }
-            # Write to cache
-            try:
-                with open(cache_path, "w", encoding="utf-8") as f:
-                    json.dump(result, f, ensure_ascii=False, indent=2)
-                logger.info(f"✓ Cached interrupted design for document: {document_id}")
-            except Exception as e:
-                logger.error(f"Cache write failed for {document_id}: {e}")
-            return result
+            set_cached_design(document_id, result)
+            yield {"phase": "done", "status": "interrupted", "data": result}
+            return
 
         # ── Phase 2 (Reduce): Global architecture & PM project plan ─────────
         logger.info("Generating production-grade global architecture and PM project plan...")
-        arch_task = generate_global_architecture(
+        yield {"phase": "architecture", "status": "started"}
+        yield {"phase": "pm_plan", "status": "started"}
+        
+        arch_task = asyncio.create_task(generate_global_architecture(
             domain_designs,
             tech_stack=tech_stack,
             design_principles=design_principles,
             security_protocols=security_protocols,
             cloud_provider=cloud_provider
-        )
-        pm_task = generate_pm_plan(
+        ))
+        pm_task = asyncio.create_task(generate_pm_plan(
             domain_designs,
             tech_stack=tech_stack,
             design_principles=design_principles,
             security_protocols=security_protocols
-        )
+        ))
+        
         arch_res, pm_res = await asyncio.gather(arch_task, pm_task)
+        
+        yield {"phase": "architecture", "status": "complete", "data": arch_res}
+        yield {"phase": "pm_plan", "status": "complete", "data": pm_res}
 
         # ── Build final response ────────────────────────────────────────────
         result = {
@@ -518,21 +576,16 @@ async def generate_system_design(
             "cloudProvider":        cloud_provider,
         }
 
-        # ── Write to cache ──────────────────────────────────────────────────
-        try:
-            with open(cache_path, "w", encoding="utf-8") as f:
-                json.dump(result, f, ensure_ascii=False, indent=2)
-            logger.info(f"✓ Cached design for document: {document_id}")
-        except Exception as e:
-            logger.error(f"Cache write failed for {document_id}: {e}")
+        set_cached_design(document_id, result)
 
-        return result
+        yield {"phase": "done", "status": "complete", "data": result}
 
     except Exception as e:
         import traceback
         logger.error(f"Design generation error: {e}")
         traceback.print_exc()
-        return generate_fallback_design(normalized, document_id)
+        fallback = generate_fallback_design(normalized, document_id)
+        yield {"phase": "done", "status": "error", "data": fallback, "error": str(e)}
 
     finally:
         try:
@@ -545,13 +598,10 @@ async def regenerate_module_design(document_id: str, module_name: str) -> Dict[s
     Re-runs the LangGraph design workflow just for one module, updates the cache,
     and re-generates the global architecture and OpenAPI/Terraform configurations.
     """
-    cache_dir  = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "cache")
-    cache_path = os.path.join(cache_dir, f"{document_id}.json")
-    if not os.path.exists(cache_path):
+    from services.valkey import get_cached_design, set_cached_design
+    cached_result = get_cached_design(document_id)
+    if not cached_result:
         raise ValueError("Design not found")
-
-    with open(cache_path, "r", encoding="utf-8") as f:
-        cached_result = json.load(f)
 
     domain_designs = cached_result.get("domainDesigns", [])
     design_to_replace = next((d for d in domain_designs if d.get("module") == module_name), None)
@@ -634,9 +684,7 @@ async def regenerate_module_design(document_id: str, module_name: str) -> Dict[s
         cached_result["projectPlan"] = pm_res
         cached_result["generatedAt"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
-        # Write to cache
-        with open(cache_path, "w", encoding="utf-8") as f:
-            json.dump(cached_result, f, ensure_ascii=False, indent=2)
+        set_cached_design(document_id, cached_result)
 
         return cached_result
 
@@ -704,13 +752,10 @@ async def apply_schema_patch(
     Applies manual patches to a module's database tables, regenerates the ER diagram,
     re-runs the API and LLD agents, and updates the global architecture.
     """
-    cache_dir  = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "cache")
-    cache_path = os.path.join(cache_dir, f"{document_id}.json")
-    if not os.path.exists(cache_path):
+    from services.valkey import get_cached_design, set_cached_design
+    cached_result = get_cached_design(document_id)
+    if not cached_result:
         raise ValueError("Design not found")
-
-    with open(cache_path, "r", encoding="utf-8") as f:
-        cached_result = json.load(f)
 
     domain_designs = cached_result.get("domainDesigns", [])
     design_to_replace = next((d for d in domain_designs if d.get("module") == module_name), None)
@@ -853,9 +898,7 @@ async def apply_schema_patch(
     cached_result["projectPlan"] = pm_res
     cached_result["generatedAt"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
-    # Write to cache
-    with open(cache_path, "w", encoding="utf-8") as f:
-        json.dump(cached_result, f, ensure_ascii=False, indent=2)
+    set_cached_design(document_id, cached_result)
 
     return cached_result
 
@@ -870,13 +913,10 @@ async def resume_module_design(
     Updates thread state with the developer's instructions and resumes execution.
     If all modules are successfully completed, compiles global architecture and returns final response.
     """
-    cache_dir  = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "cache")
-    cache_path = os.path.join(cache_dir, f"{document_id}.json")
-    if not os.path.exists(cache_path):
+    from services.valkey import get_cached_design, set_cached_design
+    cached_result = get_cached_design(document_id)
+    if not cached_result:
         raise ValueError("Design not found")
-
-    with open(cache_path, "r", encoding="utf-8") as f:
-        cached_result = json.load(f)
 
     # 1. Update checkpointer state with user instruction & reset retries
     config = {"configurable": {"thread_id": f"{document_id}_{module_name}"}}
@@ -956,9 +996,7 @@ async def resume_module_design(
 
     cached_result["generatedAt"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
-    # Write to cache
-    with open(cache_path, "w", encoding="utf-8") as f:
-        json.dump(cached_result, f, ensure_ascii=False, indent=2)
+    set_cached_design(document_id, cached_result)
 
     return cached_result
 
@@ -1026,13 +1064,10 @@ async def refine_system_design(
     Parses user message to find the target module, runs refinement graph flow,
     OR applies global architecture refinement if no module is matched.
     """
-    cache_dir  = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "cache")
-    cache_path = os.path.join(cache_dir, f"{document_id}.json")
-    if not os.path.exists(cache_path):
+    from services.valkey import get_cached_design, set_cached_design
+    cached_result = get_cached_design(document_id)
+    if not cached_result:
         raise ValueError("Design not found")
-
-    with open(cache_path, "r", encoding="utf-8") as f:
-        cached_result = json.load(f)
 
     modules = cached_result.get("modules", [])
     target_module = await parse_refinement_intent(message, modules)
@@ -1063,9 +1098,7 @@ async def refine_system_design(
         cached_result["devopsArtifacts"] = arch_res.get("devops_artifacts", {})
         cached_result["generatedAt"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
-        # Write to cache
-        with open(cache_path, "w", encoding="utf-8") as f:
-            json.dump(cached_result, f, ensure_ascii=False, indent=2)
+        set_cached_design(document_id, cached_result)
 
         return cached_result
 
@@ -1147,8 +1180,6 @@ async def refine_system_design(
     cached_result["projectPlan"] = pm_res
     cached_result["generatedAt"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
-    # Write to cache
-    with open(cache_path, "w", encoding="utf-8") as f:
-        json.dump(cached_result, f, ensure_ascii=False, indent=2)
+    set_cached_design(document_id, cached_result)
 
     return cached_result

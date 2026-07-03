@@ -135,7 +135,7 @@ async def extract_modules(normalized_text: str, constraints: str = "") -> List[s
 
     prompt += f"Document Outline:\n{outline}"
     
-    model    = get_chat_model(temperature=0.0)
+    model    = get_chat_model(temperature=0.0, fast=True)
     response = await model.ainvoke([HumanMessage(content=prompt)])
 
     modules: List[str] = []

@@ -86,7 +86,7 @@ async def api_agent_node(state: GraphState) -> dict:
         CONTEXT     = state["module_context"],
         CONSTRAINTS = constraints_block,
     )
-    model    = get_chat_model(temperature=0.05)
+    model    = get_chat_model(temperature=0.05, fast=True)
     api_design = await invoke_with_retry_and_validation(
         model=model,
         messages=[

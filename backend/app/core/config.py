@@ -8,10 +8,7 @@ load_dotenv()
 ENVIRONMENT = os.getenv("ENVIRONMENT", "local")
 PORT = int(os.getenv("PORT", "8080"))
 
-# OpenRouter configuration
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-OPENROUTER_API_BASE = os.getenv("OPENROUTER_API_BASE", "https://openrouter.ai/api/v1")
-OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "nvidia/nemotron-3-ultra-550b-a55b:free")
+
 
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
@@ -37,3 +34,7 @@ MAX_CHUNK_SIZE = int(os.getenv("MAX_CHUNK_SIZE", "2800"))
 CHUNK_OVERLAP = int(os.getenv("CHUNK_OVERLAP", "320"))
 MAX_QA_RETRIES = int(os.getenv("MAX_QA_RETRIES", "5"))
 MAX_CONCURRENT_MODULES = int(os.getenv("MAX_CONCURRENT_MODULES", "4"))
+
+# Valkey configuration
+VALKEY_HOST = os.getenv("VALKEY_HOST", "127.0.0.1")
+VALKEY_PORT = int(os.getenv("VALKEY_PORT", "6383"))

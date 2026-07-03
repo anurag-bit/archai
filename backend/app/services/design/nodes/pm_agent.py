@@ -89,7 +89,7 @@ async def generate_pm_plan(
         MODULE_DESIGNS_SUMMARY=modules_summary_str
     )
 
-    model = get_chat_model(temperature=0.2)
+    model = get_chat_model(temperature=0.2, fast=True)
     plan_result = await invoke_with_retry_and_validation(
         model=model,
         messages=[

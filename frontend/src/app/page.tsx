@@ -108,6 +108,10 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [activeStep, setActiveStep] = useState(0);
+  const [modulesList, setModulesList] = useState<string[]>([]);
+  const [completedModules, setCompletedModules] = useState<string[]>([]);
+  const [currentModuleGenerating, setCurrentModuleGenerating] = useState<string>("");
+  const [nodeProgress, setNodeProgress] = useState<Record<string, string[]>>({});
 
   const [theme, setTheme] = useState<"dark" | "light">("dark");
 
@@ -215,21 +219,99 @@ export default function Home() {
         ? (backendUrl.startsWith("http") ? `${backendUrl}/api/design` : `${backendUrl}/design`)
         : "/api/design";
 
+      // Reset progressive loading states
+      setModulesList([]);
+      setCompletedModules([]);
+      setCurrentModuleGenerating("");
+      setNodeProgress({});
+      setActiveStep(0);
+      setIsGenerating(true);
+
       const response = await fetch(fetchUrl, {
         method: "POST",
         body: formData,
       });
 
-      const payload = (await response.json()) as DesignResponse | ErrorResponse;
-
       if (!response.ok) {
-        const errorPayload = payload as ErrorResponse;
-        throw new Error(errorPayload.error ?? "Failed to generate a system design.");
+        const errorText = await response.text();
+        throw new Error(errorText || "Failed to generate a system design.");
       }
 
-      setResult(payload as DesignResponse);
-      setSelectedModuleIndex(0);
-      setActiveTab("architecture"); // Reset to main tab
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error("No response body returned from server");
+
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (trimmed.startsWith("data: ")) {
+            const dataStr = trimmed.slice(6).trim();
+            if (!dataStr) continue;
+
+            try {
+              const event = JSON.parse(dataStr);
+              if (event.phase === "extraction") {
+                if (event.status === "started") {
+                  setActiveStep(0);
+                } else if (event.status === "complete") {
+                  setActiveStep(1);
+                  setModulesList(event.data?.modules || []);
+                }
+              } else if (event.phase === "module_node") {
+                setActiveStep(2);
+                if (event.status === "complete") {
+                  const moduleName = event.data?.module;
+                  const nodeName = event.data?.node;
+                  if (moduleName && nodeName) {
+                    setNodeProgress((prev) => {
+                      const currentNodes = prev[moduleName] || [];
+                      if (currentNodes.includes(nodeName)) return prev;
+                      return {
+                        ...prev,
+                        [moduleName]: [...currentNodes, nodeName]
+                      };
+                    });
+                  }
+                }
+              } else if (event.phase === "module") {
+                setActiveStep(2);
+                if (event.status === "complete") {
+                  const moduleName = event.data?.module;
+                  if (moduleName) {
+                    setCompletedModules((prev) => {
+                      if (prev.includes(moduleName)) return prev;
+                      return [...prev, moduleName];
+                    });
+                  }
+                }
+              } else if (event.phase === "architecture") {
+                setActiveStep(3);
+              } else if (event.phase === "pm_plan") {
+                setActiveStep(4);
+              } else if (event.phase === "done") {
+                if (event.status === "complete") {
+                  setResult(event.data);
+                  setSelectedModuleIndex(0);
+                  setActiveTab("architecture");
+                } else if (event.status === "error") {
+                  throw new Error(event.error || "Generation error");
+                }
+              }
+            } catch (err) {
+              console.error("Error parsing stream chunk:", err);
+            }
+          }
+        }
+      }
     } catch (submissionError) {
       setResult(null);
       setError(
@@ -472,7 +554,13 @@ export default function Home() {
         onToggleTheme={toggleTheme}
       />
       
-      <LoadingOverlay isGenerating={isGenerating} activeStep={activeStep} />
+      <LoadingOverlay 
+        isGenerating={isGenerating} 
+        activeStep={activeStep} 
+        modulesList={modulesList}
+        completedModules={completedModules}
+        nodeProgress={nodeProgress}
+      />
 
       {result ? (
         <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">

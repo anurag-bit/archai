@@ -21,8 +21,16 @@ def get_embeddings() -> Embeddings:
     if _embeddings is None:
         with _lock:
             if _embeddings is None:
-                from services.embeddings import LocalHuggingFaceEmbeddings
-                _embeddings = LocalHuggingFaceEmbeddings()
+                import core.config
+                if core.config.ENVIRONMENT == "production":
+                    from langchain_openai import OpenAIEmbeddings
+                    _embeddings = OpenAIEmbeddings(
+                        model="text-embedding-3-small",
+                        openai_api_key=core.config.OPENAI_API_KEY
+                    )
+                else:
+                    from services.embeddings import LocalHuggingFaceEmbeddings
+                    _embeddings = LocalHuggingFaceEmbeddings()
     return _embeddings
 
 def get_chroma_client() -> chromadb.HttpClient:

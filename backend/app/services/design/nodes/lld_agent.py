@@ -82,7 +82,7 @@ async def lld_agent_node(state: GraphState) -> dict:
         API_DESIGN=json.dumps(state["api_design"], indent=2)
     )
     
-    model = get_chat_model(temperature=0.05)
+    model = get_chat_model(temperature=0.05, fast=True)
     lld_design = await invoke_with_retry_and_validation(
         model=model,
         messages=[
