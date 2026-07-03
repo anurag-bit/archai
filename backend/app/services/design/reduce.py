@@ -426,6 +426,18 @@ async def generate_devops_pipeline(tech_stack: str, architecture_markdown: str) 
     return devops
 
 
+def _clean_markdown(text: str) -> str:
+    text = text.strip()
+    if text.startswith("```"):
+        lines = text.splitlines()
+        if lines[0].startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]
+        text = "\n".join(lines).strip()
+    return text
+
+
 async def generate_global_architecture(
     domain_designs: List[Dict[str, Any]],
     tech_stack: str = "",
@@ -493,7 +505,7 @@ async def generate_global_architecture(
         arch_response = await arch_task
         openapi_spec = None
 
-    arch_markdown = arch_response.content.strip()
+    arch_markdown = _clean_markdown(arch_response.content)
     
     # 3. Kick off Terraform and DevOps in parallel
     terraform_task = asyncio.create_task(generate_terraform_code(arch_markdown, provider))

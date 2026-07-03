@@ -35,6 +35,20 @@ def get_valkey_client():
     return _valkey_client if _valkey_client is not False else None
 
 
+def _clean_markdown(text: str) -> str:
+    if not text or not isinstance(text, str):
+        return text
+    text = text.strip()
+    if text.startswith("```"):
+        lines = text.splitlines()
+        if lines[0].startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]
+        text = "\n".join(lines).strip()
+    return text
+
+
 def get_cached_design(document_id: str) -> dict or None:
     """
     Attempts to retrieve cached design from Valkey. Falls back to on-disk json file.
@@ -45,7 +59,10 @@ def get_cached_design(document_id: str) -> dict or None:
             cached = client.get(f"design:{document_id}")
             if cached:
                 logger.info(f"✓ Cache hit (Valkey) for document: {document_id}")
-                return json.loads(cached)
+                res = json.loads(cached)
+                if isinstance(res, dict) and "systemDesignMarkdown" in res:
+                    res["systemDesignMarkdown"] = _clean_markdown(res["systemDesignMarkdown"])
+                return res
         except Exception as e:
             logger.error(f"Valkey cache read error: {e}")
 
@@ -56,7 +73,10 @@ def get_cached_design(document_id: str) -> dict or None:
         try:
             with open(cache_path, "r", encoding="utf-8") as f:
                 logger.info(f"✓ Cache hit (Local Disk) for document: {document_id}")
-                return json.load(f)
+                res = json.load(f)
+                if isinstance(res, dict) and "systemDesignMarkdown" in res:
+                    res["systemDesignMarkdown"] = _clean_markdown(res["systemDesignMarkdown"])
+                return res
         except Exception as e:
             logger.error(f"Local file cache read error: {e}")
             
