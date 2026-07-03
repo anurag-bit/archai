@@ -11,32 +11,53 @@ from json_repair import repair_json
 logger = logging.getLogger(__name__)
 
 def get_chat_model(temperature: float = 0.0, fast: bool = False) -> Any:
-    openai_key = os.getenv("OPENAI_API_KEY")
-    if not openai_key:
-        raise ValueError("OPENAI_API_KEY environment variable is not set")
-    
-    # Use a faster, cheaper model for simple JSON/Graph generation
-    model_name = "gpt-4o-mini" if fast else core.config.OPENAI_MODEL
-    
-    fallback_model = ChatOpenAI(
-        model=model_name,
-        temperature=temperature,
-        openai_api_key=openai_key,
-        request_timeout=120,
-    )
-    
-    if core.config.ZAI_API_KEY:
-        primary_model = ChatOpenAI(
-            model=core.config.ZAI_MODEL if not fast else "gpt-4o-mini",
+    if core.config.ENVIRONMENT == "production":
+        api_key = core.config.OPENROUTER_API_KEY
+        if not api_key:
+            raise ValueError("OPENROUTER_API_KEY environment variable is not set")
+        
+        # Use a faster, cheaper model for simple JSON/Graph generation
+        model_name = "google/gemini-2.5-flash" if fast else core.config.OPENROUTER_MODEL
+        
+        return ChatOpenAI(
+            model=model_name,
             temperature=temperature,
-            openai_api_key=core.config.ZAI_API_KEY,
-            openai_api_base=core.config.ZAI_API_BASE,
+            openai_api_key=api_key,
+            openai_api_base=core.config.OPENROUTER_API_BASE,
             request_timeout=120,
-            max_retries=0,
         )
-        return primary_model.with_fallbacks([fallback_model])
-    
-    return fallback_model
+    else:
+        openai_key = os.getenv("OPENAI_API_KEY")
+        
+        # Use a faster, cheaper model for simple JSON/Graph generation
+        model_name = "gpt-4o-mini" if fast else core.config.OPENAI_MODEL
+        
+        fallback_model = None
+        if openai_key:
+            fallback_model = ChatOpenAI(
+                model=model_name,
+                temperature=temperature,
+                openai_api_key=openai_key,
+                request_timeout=120,
+            )
+        
+        if core.config.ZAI_API_KEY:
+            primary_model = ChatOpenAI(
+                model=core.config.ZAI_MODEL if not fast else "gpt-4o-mini",
+                temperature=temperature,
+                openai_api_key=core.config.ZAI_API_KEY,
+                openai_api_base=core.config.ZAI_API_BASE,
+                request_timeout=120,
+                max_retries=0,
+            )
+            if fallback_model:
+                return primary_model.with_fallbacks([fallback_model])
+            return primary_model
+            
+        if fallback_model:
+            return fallback_model
+            
+        raise ValueError("No API keys found for local environment. Please set ZAI_API_KEY or OPENAI_API_KEY")
 
 
 def normalize_text(text: str) -> str:
