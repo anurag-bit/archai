@@ -406,7 +406,7 @@ async def generate_system_design(
                             })
                     
                     # Graph finished, retrieve final state from checkpointer
-                    final_state = await _module_workflow_app.get_state(config)
+                    final_state = await _module_workflow_app.aget_state(config)
                     design = final_state.values.get("module_design")
                     
                     if design:
