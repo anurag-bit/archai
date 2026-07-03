@@ -1,6 +1,7 @@
 import os
 import json
 import logging
+import pickle
 import redis
 import core.config
 
