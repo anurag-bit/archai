@@ -335,7 +335,7 @@ async def generate_system_design(
     # ── Cache lookup ────────────────────────────────────────────────────────
     from services.valkey import get_cached_design, set_cached_design
     cached = get_cached_design(document_id)
-    if cached:
+    if cached and cached.get("status") == "completed":
         cached["generatedAt"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
         yield {"phase": "done", "status": "complete", "data": cached}
         return
