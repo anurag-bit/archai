@@ -32,7 +32,11 @@ def generate_ddl_from_tables(tables: List[Dict[str, Any]], db_type: str = "postg
                 is_unique = "unique" in constraints.lower() or "primary key" in constraints.lower()
                 is_indexed = is_unique or "index" in constraints.lower()
                 
-                comment = f" // SRS: {justification.replace('\n',' ').strip()}" if justification else ""
+                if justification:
+                    clean_just = justification.replace('\n', ' ').strip()
+                    comment = f" // SRS: {clean_just}"
+                else:
+                    comment = ""
                 if is_unique:
                     mongo_parts.append(f"db.{collection_name}.createIndex({{ \"{col_name}\": 1 }}, {{ unique: true }});{comment}")
                 elif is_indexed:
@@ -71,7 +75,11 @@ def generate_ddl_from_tables(tables: List[Dict[str, Any]], db_type: str = "postg
                 is_unique = "unique" in constraints.lower() or "primary key" in constraints.lower()
                 is_indexed = is_unique or "index" in constraints.lower()
                 
-                comment = f" // SRS: {justification.replace('\n',' ').strip()}" if justification else ""
+                if justification:
+                    clean_just = justification.replace('\n', ' ').strip()
+                    comment = f" // SRS: {clean_just}"
+                else:
+                    comment = ""
                 if is_unique:
                     cypher_parts.append(f"CREATE CONSTRAINT FOR (n:{node_label}) REQUIRE n.{col_name} IS UNIQUE;{comment}")
                 elif is_indexed:
@@ -107,8 +115,9 @@ def generate_ddl_from_tables(tables: List[Dict[str, Any]], db_type: str = "postg
                 col_def = f"    {col.get('name','')} {col.get('type','')}"
                 if col.get("constraints"):
                     col_def += f" {col['constraints']}"
-                if col.get("justification"):
-                    col_def += f", -- SRS: {col['justification'].replace('\n',' ').strip()}"
+                if "justification" in col and col["justification"]:
+                    clean_justification = col['justification'].replace('\n', ' ').strip()
+                    col_def += f", -- SRS: {clean_justification}"
                 else:
                     col_def += ","
                 col_defs.append(col_def)
