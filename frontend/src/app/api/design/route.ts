@@ -24,7 +24,8 @@ export async function POST(request: Request) {
     formData.append("cloud_provider", cloudProvider);
 
     // Forward the request to the backend
-    const response = await fetch("http://127.0.0.1:8080/api/design", {
+    const backendUrl = process.env.BACKEND_URL || "http://127.0.0.1:8080";
+    const response = await fetch(`${backendUrl}/api/design`, {
       method: "POST",
       body: formData,
     });
