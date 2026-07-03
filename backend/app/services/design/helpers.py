@@ -26,6 +26,10 @@ def get_chat_model(temperature: float = 0.0, fast: bool = False) -> Any:
             openai_api_base=core.config.OPENROUTER_API_BASE,
             request_timeout=120,
             max_retries=5,
+            default_headers={
+                "HTTP-Referer": "http://localhost:3000",
+                "X-Title": "Archai"
+            }
         )
         
         # Free models on OpenRouter often hit rate limits. Add a fallback!
@@ -36,6 +40,10 @@ def get_chat_model(temperature: float = 0.0, fast: bool = False) -> Any:
             openai_api_base=core.config.OPENROUTER_API_BASE,
             request_timeout=120,
             max_retries=3,
+            default_headers={
+                "HTTP-Referer": "http://localhost:3000",
+                "X-Title": "Archai"
+            }
         )
         
         return primary_model.with_fallbacks([fallback_model])
