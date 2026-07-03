@@ -19,11 +19,19 @@ from routes import (
 )
 
 import logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-    handlers=[logging.StreamHandler(sys.stdout)]
-)
+import sys
+
+# Configure loggers for all our modules
+root_logger = logging.getLogger()
+if not root_logger.handlers:
+    h = logging.StreamHandler(sys.stdout)
+    h.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s"))
+    root_logger.addHandler(h)
+root_logger.setLevel(logging.INFO)
+
+for name in ["services", "routes", "core", "utils", "app"]:
+    logging.getLogger(name).setLevel(logging.INFO)
+
 logger = logging.getLogger(__name__)
 
 from services.vector_store import (
