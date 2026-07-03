@@ -426,7 +426,7 @@ async def generate_system_design(
                             }
                         })
             except Exception as e:
-                logger.error(f"Error in module workflow for '{module_name}': {e}")
+                logger.error(f"Error in module workflow for '{module_name}': {e}", exc_info=True)
                 await queue.put({
                     "phase": "module",
                     "status": "interrupted",
