@@ -36,6 +36,10 @@ from services.design.nodes import (
     generate_pm_plan,
 )
 from core.config import MAX_QA_RETRIES, MAX_CONCURRENT_MODULES
+import logging
+logger = logging.getLogger(__name__)
+
+
 
 # ─────────────────────────── Graph compilation ───────────────────────────────
 
@@ -48,11 +52,15 @@ def module_router_node(state: ModuleGraphState) -> dict:
 
 
 def route_from_router(state: ModuleGraphState) -> str:
+    if state.get("qa_retries", 0) >= MAX_QA_RETRIES:
+        logger.info(f"[router] MAX QA RETRIES ({MAX_QA_RETRIES}) reached. Force-accepting.")
+        return "save"
+
     feedback = state.get("qa_feedback") or ""
     if feedback.startswith("HUMAN INSTRUCTION:"):
-        print(f"[router] Routing directly to dba_agent (Refinement Mode)")
+        logger.info(f"[router] Routing directly to dba_agent (Refinement Mode)")
         return "dba_agent"
-    print(f"[router] Routing to fetch_context (Initial Build Mode)")
+    logger.info(f"[router] Routing to fetch_context (Initial Build Mode)")
     return "fetch_context"
 
 
@@ -76,7 +84,8 @@ def _build_module_graph() -> StateGraph:
         route_from_router,
         {
             "fetch_context": "fetch_context",
-            "dba_agent": "dba_agent"
+            "dba_agent": "dba_agent",
+            "save": "save_module_design"
         }
     )
 
@@ -330,30 +339,30 @@ async def generate_system_design(
             with open(cache_path, "r", encoding="utf-8") as f:
                 cached = json.load(f)
             cached["generatedAt"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-            print(f"✓ Returning cached design for document: {document_id}")
+            logger.info(f"✓ Returning cached design for document: {document_id}")
             return cached
         except Exception as e:
-            print(f"Cache read failed for {document_id}: {e}")
+            logger.error(f"Cache read failed for {document_id}: {e}")
 
     try:
         # ── Index chunks using REGEX only (no LLM call here!) ──────────────
-        print("Indexing document chunks into Chroma...")
+        logger.info("Indexing document chunks into Chroma...")
         prelim_modules = re.findall(
             r'\d+\.\s*Module\s*Name\s*-\s*([^\n]+)', normalized, re.IGNORECASE
         )
         chunks = split_document(normalized, prelim_modules or None)
         index_chunks_to_chroma(document_id, chunks, "domain_design", request_id)
-        print(f"Indexed {len(chunks)} chunks into Chroma")
+        logger.info(f"Indexed {len(chunks)} chunks into Chroma")
 
         # ── Run LangGraph MAS workflow (Parallel Processing) ──────────────────
-        print("Starting Parallel LangGraph MAS workflow...")
+        logger.info("Starting Parallel LangGraph MAS workflow...")
         
         # Build a combined constraints string for the extractor
         extractor_constraints = f"Tech Stack: {tech_stack}\nDesign: {design_principles}\nSecurity: {security_protocols}"
         modules = await extract_modules(normalized, constraints=extractor_constraints)
 
         sem = asyncio.Semaphore(MAX_CONCURRENT_MODULES)
-        print(f"Executing module designs in parallel (concurrency limit: {MAX_CONCURRENT_MODULES})...")
+        logger.info(f"Executing module designs in parallel (concurrency limit: {MAX_CONCURRENT_MODULES})...")
 
         async def run_module_workflow(module_name: str) -> Dict[str, Any]:
             async with sem:
@@ -402,7 +411,7 @@ async def generate_system_design(
                     "qa_feedback": state.get("qa_feedback"),
                 }
         
-        print(f"LangGraph workflow complete. {len(domain_designs)} completed, {len(interrupted_modules)} interrupted.")
+        logger.info(f"LangGraph workflow complete. {len(domain_designs)} completed, {len(interrupted_modules)} interrupted.")
 
         # ── Assemble retrieved chunks for highlights ────────────────────────
         all_chunks: Dict[int, Dict[str, Any]] = {}
@@ -450,13 +459,13 @@ async def generate_system_design(
             try:
                 with open(cache_path, "w", encoding="utf-8") as f:
                     json.dump(result, f, ensure_ascii=False, indent=2)
-                print(f"✓ Cached interrupted design for document: {document_id}")
+                logger.info(f"✓ Cached interrupted design for document: {document_id}")
             except Exception as e:
-                print(f"Cache write failed for {document_id}: {e}")
+                logger.error(f"Cache write failed for {document_id}: {e}")
             return result
 
         # ── Phase 2 (Reduce): Global architecture & PM project plan ─────────
-        print("Generating production-grade global architecture and PM project plan...")
+        logger.info("Generating production-grade global architecture and PM project plan...")
         arch_task = generate_global_architecture(
             domain_designs,
             tech_stack=tech_stack,
@@ -513,15 +522,15 @@ async def generate_system_design(
         try:
             with open(cache_path, "w", encoding="utf-8") as f:
                 json.dump(result, f, ensure_ascii=False, indent=2)
-            print(f"✓ Cached design for document: {document_id}")
+            logger.info(f"✓ Cached design for document: {document_id}")
         except Exception as e:
-            print(f"Cache write failed for {document_id}: {e}")
+            logger.error(f"Cache write failed for {document_id}: {e}")
 
         return result
 
     except Exception as e:
         import traceback
-        print(f"Design generation error: {e}")
+        logger.error(f"Design generation error: {e}")
         traceback.print_exc()
         return generate_fallback_design(normalized, document_id)
 
@@ -682,7 +691,7 @@ async def _update_mermaid_er(old_mermaid: str, tables: List[Dict[str, Any]]) -> 
             content = content[:-3]
         return content.strip()
     except Exception as e:
-        print(f"Failed to generate ER diagram: {e}")
+        logger.error(f"Failed to generate ER diagram: {e}")
         return old_mermaid
 
 
@@ -910,7 +919,7 @@ async def resume_module_design(
 
     # 4. Check if all modules are completed now
     if not interrupted_modules:
-        print("All modules completed. Generating global architecture and PM plan...")
+        logger.info("All modules completed. Generating global architecture and PM plan...")
         arch_task = generate_global_architecture(
             domain_designs,
             tech_stack=cached_result.get("techStack", ""),
@@ -995,7 +1004,7 @@ async def parse_refinement_intent(message: str, modules: List[str]) -> Optional[
             if m.lower() in content_lower or content_lower in m.lower():
                 return m
     except Exception as e:
-        print(f"[router] LLM invocation failed during intent parsing: {e}")
+        logger.error(f"[router] LLM invocation failed during intent parsing: {e}")
 
     # Fallback to direct keyword search in the user's original message
     msg_lower = message.lower()
@@ -1003,7 +1012,7 @@ async def parse_refinement_intent(message: str, modules: List[str]) -> Optional[
         # Strip common words like 'module' or 'management' to find core words
         core_terms = [t for t in m.lower().replace("module", "").replace("management", "").split() if len(t) > 2]
         if any(term in msg_lower for term in core_terms):
-            print(f"[router] Fallback matched module '{m}' based on keywords in user message")
+            logger.info(f"[router] Fallback matched module '{m}' based on keywords in user message")
             return m
             
     return None
@@ -1036,7 +1045,7 @@ async def refine_system_design(
 
     # ─── GLOBAL REFINEMENT (No specific module matched) ───
     if not target_module:
-        print(f"[refine] No specific module matched. Applying global refinement: '{message}'")
+        logger.info(f"[refine] No specific module matched. Applying global refinement: '{message}'")
         
         # Run global architecture generation with the refinement instruction
         arch_res = await generate_global_architecture(
@@ -1061,7 +1070,7 @@ async def refine_system_design(
         return cached_result
 
     # ─── MODULE-SPECIFIC REFINEMENT (Module matched) ───
-    print(f"[refine] Module '{target_module}' matched. Applying module refinement.")
+    logger.info(f"[refine] Module '{target_module}' matched. Applying module refinement.")
     
     # Find the target module design
     module_design_entry = next((d for d in domain_designs if d.get("module") == target_module), None)

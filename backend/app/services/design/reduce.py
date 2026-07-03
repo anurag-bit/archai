@@ -202,7 +202,7 @@ def validate_and_format_terraform_code(hcl_content: str) -> str:
             "docker", "run", "--rm",
             "-v", f"{run_dir}:/workspace",
             "-w", "/workspace",
-            "hashicorp/terraform:latest",
+            "hashicorp/terraform:1.9.8",
             "init", "-backend=false"
         ]
         init_res = subprocess.run(init_cmd, capture_output=True, text=True, timeout=60)
@@ -212,7 +212,7 @@ def validate_and_format_terraform_code(hcl_content: str) -> str:
             "docker", "run", "--rm",
             "-v", f"{run_dir}:/workspace",
             "-w", "/workspace",
-            "hashicorp/terraform:latest",
+            "hashicorp/terraform:1.9.8",
             "fmt", "-check"
         ]
         fmt_check_res = subprocess.run(fmt_check_cmd, capture_output=True, text=True, timeout=30)
@@ -223,7 +223,7 @@ def validate_and_format_terraform_code(hcl_content: str) -> str:
                 "docker", "run", "--rm",
                 "-v", f"{run_dir}:/workspace",
                 "-w", "/workspace",
-                "hashicorp/terraform:latest",
+                "hashicorp/terraform:1.9.8",
                 "fmt"
             ]
             subprocess.run(fmt_cmd, capture_output=True, text=True, timeout=30)
@@ -237,7 +237,7 @@ def validate_and_format_terraform_code(hcl_content: str) -> str:
             "docker", "run", "--rm",
             "-v", f"{run_dir}:/workspace",
             "-w", "/workspace",
-            "hashicorp/terraform:latest",
+            "hashicorp/terraform:1.9.8",
             "validate", "-json"
         ]
         validate_res = subprocess.run(validate_cmd, capture_output=True, text=True, timeout=30)
@@ -356,8 +356,15 @@ async def generate_openapi_spec(domain_designs: List[Dict[str, Any]]) -> str:
     content = response.content.strip()
     if content.startswith("```"):
         content = re.sub(r"^```[a-zA-Z]*\n", "", content)
-        content = re.sub(r"\n```$", "", content)
-    return content.strip()
+    content = content.strip()
+    
+    import yaml
+    try:
+        yaml.safe_load(content)
+    except yaml.YAMLError as e:
+        content = f"# ⚠️ Invalid OpenAPI YAML: {e}\n\n{content}"
+        
+    return content
 
 
 _DEVOPS_SYSTEM = (

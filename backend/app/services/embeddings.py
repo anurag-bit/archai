@@ -96,11 +96,11 @@ class LocalHuggingFaceEmbeddings(Embeddings):
                 if os.path.isdir(local_model_path):
                     model_name = local_model_path
                     model_kwargs = {'device': 'cpu', 'local_files_only': True}
-                    print(f"✓ Loading local offline HuggingFace embeddings model from: {model_name}")
+                    logger.info(f"✓ Loading local offline HuggingFace embeddings model from: {model_name}")
                 else:
                     model_name = os.getenv("EMBEDDING_MODEL", "BAAI/bge-small-en-v1.5")
                     model_kwargs = {'device': 'cpu'}
-                    print(f"✓ Loading local HuggingFace embeddings model: {model_name}")
+                    logger.info(f"✓ Loading local HuggingFace embeddings model: {model_name}")
 
                 self._underlying = HuggingFaceEmbeddings(
                     model_name=model_name,
@@ -116,6 +116,10 @@ class LocalHuggingFaceEmbeddings(Embeddings):
                 self.degraded = True
                 self._underlying = LocalDeterministicEmbeddings()
         return self._underlying
+        
+    def ensure_loaded(self) -> None:
+        """Public method to ensure the model is loaded in memory."""
+        self._get_underlying()
 
     def embed_documents(self, texts: List[str]) -> List[List[float]]:
         return self._get_underlying().embed_documents(texts)

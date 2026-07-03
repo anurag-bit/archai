@@ -3,6 +3,10 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from services.design.helpers import get_chat_model, invoke_with_retry_and_validation
 from services.design.validators import validate_test_strategy
 from services.design.state import GraphState
+import logging
+logger = logging.getLogger(__name__)
+
+
 
 _QA_SYSTEM = (
     "You are an SDET & Test Strategy Agent (The QA Lead).\n"
@@ -54,20 +58,15 @@ async def qa_agent_node(state: GraphState) -> dict:
     Returns only the keys it modifies.
     """
     module = state["current_module"]
-    print(f"[qa_agent_node] Designing test strategy and BDD cases for '{module}'")
+    logger.info(f"[qa_agent_node] Designing test strategy and BDD cases for '{module}'")
 
-    # Build constraint block from user-supplied architecture constraints
-    constraints_block = "### STRICT ARCHITECTURAL CONSTRAINTS\n"
-    if state.get("tech_stack"):
-        constraints_block += f"- TECH STACK: All testing tools and scripts MUST align with {state['tech_stack']}.\n"
-    if state.get("design_principles"):
-        constraints_block += f"- DESIGN PATTERNS: Test structuring MUST follow {state['design_principles']}.\n"
-    if state.get("security_protocols"):
-        constraints_block += f"- SECURITY: Test verification must ensure security protocols like {state['security_protocols']} are satisfied.\n"
-    if state.get("open_questions_answers"):
-        constraints_block += f"- USER CLARIFICATIONS (ANSWERS TO OPEN QUESTIONS):\n{state['open_questions_answers']}\n"
-    if constraints_block == "### STRICT ARCHITECTURAL CONSTRAINTS\n":
-        constraints_block = ""
+    from services.design.helpers import build_constraints_block
+    constraints_block = build_constraints_block(
+        state,
+        tech_stack_template="- TECH STACK: All testing tools and scripts MUST align with {tech_stack}.\n",
+        design_template="- DESIGN PATTERNS: Test structuring MUST follow {design_principles}.\n",
+        security_template="- SECURITY: Test verification must ensure security protocols like {security_protocols} are satisfied.\n"
+    )
 
     prompt = _QA_PROMPT.format(
         MODULE_NAME=module,
@@ -85,6 +84,6 @@ async def qa_agent_node(state: GraphState) -> dict:
         ],
         validator=validate_test_strategy
     )
-    print(f"[qa_agent_node] Test strategy ready for '{module}'")
+    logger.info(f"[qa_agent_node] Test strategy ready for '{module}'")
 
     return {"test_strategy": test_strategy}

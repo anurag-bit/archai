@@ -1,6 +1,10 @@
 import re
 from typing import List, Dict, Any
 from services.design.state import ModuleGraphState
+import logging
+logger = logging.getLogger(__name__)
+
+
 
 def generate_ddl_from_tables(tables: List[Dict[str, Any]], db_type: str = "postgres") -> str:
     if not tables:
@@ -206,15 +210,16 @@ def sanitize_mermaid_er(mermaid_er: str, tables: List[Dict[str, Any]]) -> str:
                 brace_depth -= 1
                 
         if is_relationship:
-            # Fix invalid relationship arrows (like -> or --> or --)
-            line = re.sub(r'\s+-[->]\s+', ' ||--o{ ', line)
-            line = re.sub(r'(?<![|o{}])--(?![|o{}])', '||--o{', line)
-            
-            # Normalize table/entity names: replace hyphens with underscores outside the label/comment
+            # Split first to avoid mangling the label side
             parts = line.split(":", 1)
             struct_part = parts[0]
             label_part = ":" + parts[1] if len(parts) > 1 else ""
+
+            # Fix invalid relationship arrows (like -> or --> or --) ONLY in struct_part
+            struct_part = re.sub(r'\s+-[->]\s+', ' ||--o{ ', struct_part)
+            struct_part = re.sub(r'(?<![|o{}])--(?![|o{}])', '||--o{', struct_part)
             
+            # Normalize table/entity names: replace hyphens with underscores outside the label/comment
             struct_part = re.sub(r'\b([a-zA-Z_][a-zA-Z0-9_-]*)\b', lambda m: m.group(1).replace("-", "_"), struct_part)
             line = struct_part + label_part
             
@@ -272,7 +277,7 @@ async def save_module_design_node(state: ModuleGraphState) -> dict:
     and saves it to state['module_design'].
     """
     module = state["current_module"]
-    print(f"[save_module_design_node] Saving completed design for '{module}'")
+    logger.info(f"[save_module_design_node] Saving completed design for '{module}'")
 
     dba    = state["dba_draft"]
     api    = state["api_design"]
@@ -369,7 +374,7 @@ def compute_schema_diff(old_tables: List[Dict[str, Any]], new_tables: List[Dict[
             for c in new_cols:
                 if not isinstance(c, dict):
                     continue
-                c_name = col_name = c.get("name", "")
+                c_name = c.get("name", "")
                 if not c_name:
                     continue
                     
@@ -380,7 +385,11 @@ def compute_schema_diff(old_tables: List[Dict[str, Any]], new_tables: List[Dict[
                 else:
                     old_c = old_cols[c_name]
                     type_changed = c.get("type") != old_c.get("type")
-                    const_changed = c.get("constraints") != old_c.get("constraints")
+                    
+                    new_const = str(c.get("constraints") or "").lower().strip()
+                    old_const = str(old_c.get("constraints") or "").lower().strip()
+                    const_changed = new_const != old_const
+                    
                     if type_changed or const_changed:
                         details = []
                         if type_changed:

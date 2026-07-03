@@ -7,6 +7,10 @@ from services.vector_store import similarity_search_with_score
 from services.design.helpers import get_chat_model
 from langchain_core.prompts import ChatPromptTemplate
 from core.config import OPENAI_MODEL
+import logging
+logger = logging.getLogger(__name__)
+
+
 
 router = APIRouter()
 
@@ -61,7 +65,7 @@ async def chat_endpoint(req: ChatRequest):
         }
     except Exception as e:
         request_id = str(uuid.uuid4())
-        print(f"[Request {request_id}] Chat error: {traceback.format_exc()}")
+        logger.error(f"[Request {request_id}] Chat error: {traceback.format_exc()}")
         raise HTTPException(
             status_code=500,
             detail={"error": "An internal error occurred", "requestId": request_id}

@@ -3,6 +3,10 @@ from typing import List, Dict, Any
 from langchain_core.messages import HumanMessage, SystemMessage
 from services.design.helpers import get_chat_model, invoke_with_retry_and_validation
 from services.design.validators import validate_project_plan
+import logging
+logger = logging.getLogger(__name__)
+
+
 
 _PM_SYSTEM = (
     "You are a Product Manager & Technical Lead Agent.\n"
@@ -48,7 +52,7 @@ async def generate_pm_plan(
     Aggregates all module designs, performs complexity analysis, estimates story points,
     builds dependency graphs, timelines, and registers risks.
     """
-    print(f"[pm_agent] Generating project plan and roadmap for {len(domain_designs)} modules...")
+    logger.info(f"[pm_agent] Generating project plan and roadmap for {len(domain_designs)} modules...")
 
     # Build a summary of each module's size & complexity to feed into the PM prompt
     summaries = []
@@ -95,5 +99,5 @@ async def generate_pm_plan(
         validator=validate_project_plan
     )
     
-    print("[pm_agent] Project plan generation complete.")
+    logger.info("[pm_agent] Project plan generation complete.")
     return plan_result
