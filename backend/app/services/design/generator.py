@@ -35,7 +35,7 @@ from services.design.nodes import (
     save_module_design_node,
     generate_pm_plan,
 )
-from core.config import MAX_QA_RETRIES, MAX_CONCURRENT_MODULES
+from core.config import MAX_QA_RETRIES, MAX_CONCURRENT_MODULES, VALKEY_HOST, VALKEY_PORT
 import logging
 logger = logging.getLogger(__name__)
 
@@ -111,7 +111,7 @@ def _build_module_graph() -> StateGraph:
 # Initialize persistent checkpointer dynamic saver using Valkey (DB 1)
 from services.valkey import DynamicSaver
 checkpointer = DynamicSaver(
-    valkey_url=f"redis://{core.config.VALKEY_HOST}:{core.config.VALKEY_PORT}/1"
+    valkey_url=f"redis://{VALKEY_HOST}:{VALKEY_PORT}/1"
 )
 
 # Compiled app
