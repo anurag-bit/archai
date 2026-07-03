@@ -5,6 +5,10 @@ from fastapi import APIRouter, Form, File, UploadFile, HTTPException
 from pydantic import BaseModel
 from services.design import generate_system_design, regenerate_module_design, apply_schema_patch, resume_module_design, refine_system_design
 from utils.pdf_parser import extract_pdf_text
+import logging
+logger = logging.getLogger(__name__)
+
+
 
 router = APIRouter()
 
@@ -60,7 +64,7 @@ async def design_endpoint(
         raise
     except Exception as e:
         request_id = str(uuid.uuid4())
-        print(f"[Request {request_id}] Design generation error: {traceback.format_exc()}")
+        logger.error(f"[Request {request_id}] Design generation error: {traceback.format_exc()}")
         raise HTTPException(
             status_code=500,
             detail={"error": "An internal error occurred", "requestId": request_id}
@@ -75,7 +79,7 @@ async def regenerate_module_endpoint(document_id: str, module_name: str):
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         request_id = str(uuid.uuid4())
-        print(f"[Request {request_id}] Module regeneration error: {traceback.format_exc()}")
+        logger.error(f"[Request {request_id}] Module regeneration error: {traceback.format_exc()}")
         raise HTTPException(
             status_code=500,
             detail={"error": "An internal error occurred during module regeneration", "requestId": request_id}
@@ -95,7 +99,7 @@ async def patch_schema_endpoint(document_id: str, module_name: str, req: PatchSc
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         request_id = str(uuid.uuid4())
-        print(f"[Request {request_id}] Schema patch error: {traceback.format_exc()}")
+        logger.error(f"[Request {request_id}] Schema patch error: {traceback.format_exc()}")
         raise HTTPException(
             status_code=500,
             detail={"error": "An internal error occurred during schema patching", "requestId": request_id}
@@ -116,7 +120,7 @@ async def resume_design_endpoint(document_id: str, req: ResumeDesignRequest):
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         request_id = str(uuid.uuid4())
-        print(f"[Request {request_id}] Resume design error: {traceback.format_exc()}")
+        logger.error(f"[Request {request_id}] Resume design error: {traceback.format_exc()}")
         raise HTTPException(
             status_code=500,
             detail={"error": "An internal error occurred during design resumption", "requestId": request_id}
@@ -136,7 +140,7 @@ async def refine_design_endpoint(document_id: str, req: RefineDesignRequest):
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         request_id = str(uuid.uuid4())
-        print(f"[Request {request_id}] Refine design error: {traceback.format_exc()}")
+        logger.error(f"[Request {request_id}] Refine design error: {traceback.format_exc()}")
         raise HTTPException(
             status_code=500,
             detail={"error": "An internal error occurred during design refinement", "requestId": request_id}

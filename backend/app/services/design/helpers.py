@@ -243,3 +243,29 @@ async def invoke_with_retry_and_validation(
             last_parsed = {"raw": "Failed to parse content or model failed to respond"}
             
     return last_parsed or {"raw": "Failed all attempts to retrieve valid JSON"}
+
+def build_constraints_block(
+    state: dict,
+    tech_stack_template: str = "- TECH STACK: You MUST align with {tech_stack}.\n",
+    design_template: str = "- DESIGN PATTERNS: You MUST implement {design_principles}.\n",
+    security_template: str = "- SECURITY: You MUST enforce {security_protocols}.\n"
+) -> str:
+    """Builds a standardized architectural constraint block for agent prompts."""
+    constraints_block = "### STRICT ARCHITECTURAL CONSTRAINTS\n"
+    
+    if state.get("tech_stack"):
+        constraints_block += tech_stack_template.format(tech_stack=state['tech_stack'])
+        
+    if state.get("design_principles"):
+        constraints_block += design_template.format(design_principles=state['design_principles'])
+        
+    if state.get("security_protocols"):
+        constraints_block += security_template.format(security_protocols=state['security_protocols'])
+        
+    if state.get("open_questions_answers"):
+        constraints_block += f"- USER CLARIFICATIONS (ANSWERS TO OPEN QUESTIONS):\n{state['open_questions_answers']}\n"
+        
+    if constraints_block == "### STRICT ARCHITECTURAL CONSTRAINTS\n":
+        return ""
+        
+    return constraints_block

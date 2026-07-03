@@ -5,6 +5,10 @@ import threading
 from typing import List, Dict, Any, Tuple, Optional
 from langchain_core.embeddings import Embeddings
 from langchain_core.documents import Document
+import logging
+logger = logging.getLogger(__name__)
+
+
 
 # Global cache variables
 _embeddings = None
@@ -17,23 +21,8 @@ def get_embeddings() -> Embeddings:
     if _embeddings is None:
         with _lock:
             if _embeddings is None:
-                from core import config
-                if config.ENVIRONMENT == "production":
-                    from langchain_openai import OpenAIEmbeddings
-                    _embeddings = OpenAIEmbeddings(
-                        openai_api_key=config.OPENROUTER_API_KEY,
-                        openai_api_base=config.OPENROUTER_API_BASE,
-                        model="nvidia/llama-nemotron-embed-vl-1b-v2:free",
-                        default_headers={
-                            "HTTP-Referer": "http://localhost:3000",
-                            "X-Title": "Archai"
-                        },
-                        model_kwargs={"encoding_format": "float"},
-                        check_embedding_ctx_length=False
-                    )
-                else:
-                    from services.embeddings import LocalHuggingFaceEmbeddings
-                    _embeddings = LocalHuggingFaceEmbeddings()
+                from services.embeddings import LocalHuggingFaceEmbeddings
+                _embeddings = LocalHuggingFaceEmbeddings()
     return _embeddings
 
 def get_chroma_client() -> chromadb.HttpClient:
@@ -100,7 +89,7 @@ def index_chunks_to_chroma(
             metadatas=metadatas
         )
     except Exception as e:
-        print(f"Error indexing chunks to Chroma: {e}")
+        logger.error(f"Error indexing chunks to Chroma: {e}")
         raise
 
 def query_chroma_for_chunks(
@@ -159,7 +148,7 @@ def query_chroma_for_chunks(
                 })
         return chunks
     except Exception as e:
-        print(f"Error querying Chroma for chunks: {e}")
+        logger.error(f"Error querying Chroma for chunks: {e}")
         raise
 
 def clear_chroma_chunks(document_id: str, phase: str, request_id: str) -> None:
@@ -178,7 +167,7 @@ def clear_chroma_chunks(document_id: str, phase: str, request_id: str) -> None:
             }
         )
     except Exception as e:
-        print(f"Error clearing Chroma chunks: {e}")
+        logger.error(f"Error clearing Chroma chunks: {e}")
 
 def sweep_temporary_chunks() -> None:
     """
@@ -204,15 +193,15 @@ def sweep_temporary_chunks() -> None:
                 ]
             }
         )
-        print("✓ Swept temporary Chroma chunks successfully")
+        logger.info("✓ Swept temporary Chroma chunks successfully")
     except Exception as e:
-        print(f"Chroma temporary sweep skipped or failed: {e}")
+        logger.error(f"Chroma temporary sweep skipped or failed: {e}")
 
 def stop_sweep_scheduler() -> None:
     """
     Triggers the shutdown event to stop the background sweep thread.
     """
-    print("[vector_store] Stopping sweep scheduler...")
+    logger.info("[vector_store] Stopping sweep scheduler...")
     _shutdown_event.set()
 
 def start_sweep_scheduler(interval_seconds: int = 1800) -> None:
@@ -222,15 +211,15 @@ def start_sweep_scheduler(interval_seconds: int = 1800) -> None:
     _shutdown_event.clear()
     
     def run_sweep():
-        print(f"[vector_store] Sweep scheduler started with interval {interval_seconds}s")
+        logger.info(f"[vector_store] Sweep scheduler started with interval {interval_seconds}s")
         while not _shutdown_event.is_set():
             if _shutdown_event.wait(timeout=interval_seconds):
                 break
             try:
                 sweep_temporary_chunks()
             except Exception as e:
-                print(f"Periodic sweep failed: {e}")
-        print("[vector_store] Sweep scheduler thread stopped.")
+                logger.error(f"Periodic sweep failed: {e}")
+        logger.info("[vector_store] Sweep scheduler thread stopped.")
             
     thread = threading.Thread(target=run_sweep, daemon=True)
     thread.start()
@@ -260,6 +249,8 @@ def add_documents(
                 flat_meta[k] = v
             else:
                 flat_meta[k] = str(v)
+        
+        flat_meta["temporary"] = False
         flat_metadatas.append(flat_meta)
 
     collection.upsert(

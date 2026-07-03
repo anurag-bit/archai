@@ -18,6 +18,9 @@ from routes import (
     search_router,
 )
 
+import logging
+logger = logging.getLogger(__name__)
+
 from services.vector_store import (
     sweep_temporary_chunks,
     get_embeddings,
@@ -33,13 +36,13 @@ async def lifespan(app: FastAPI):
         sweep_temporary_chunks()
         start_sweep_scheduler()
     except Exception as e:
-        print(f"Warning: Startup check failed: {e}")
+        logger.error(f"Warning: Startup check failed: {e}")
     yield
     # Shutdown logic
     try:
         stop_sweep_scheduler()
     except Exception as e:
-        print(f"Error stopping sweep scheduler: {e}")
+        logger.error(f"Error stopping sweep scheduler: {e}")
 
 app = FastAPI(title="Archai Backend", version="1.0.0", lifespan=lifespan)
 

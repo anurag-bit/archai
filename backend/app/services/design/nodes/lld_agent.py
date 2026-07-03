@@ -3,6 +3,10 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from services.design.helpers import get_chat_model, parse_llm_json, invoke_with_retry_and_validation
 from services.design.validators import validate_lld_design
 from services.design.state import GraphState
+import logging
+logger = logging.getLogger(__name__)
+
+
 
 _LLD_SYSTEM = (
     "You are a Low-Level System Design Engineer. "
@@ -70,7 +74,7 @@ Generate the low-level design diagrams for this module. Output strict JSON with 
 async def lld_agent_node(state: GraphState) -> dict:
     """Generates DFD and Component diagrams for the module."""
     module = state["current_module"]
-    print(f"[lld_agent_node] Designing LLD/DFD for '{module}'")
+    logger.info(f"[lld_agent_node] Designing LLD/DFD for '{module}'")
 
     prompt = _LLD_PROMPT.format(
         MODULE_NAME=module,
@@ -87,6 +91,6 @@ async def lld_agent_node(state: GraphState) -> dict:
         ],
         validator=validate_lld_design
     )
-    print(f"[lld_agent_node] LLD/DFD ready for '{module}'")
+    logger.info(f"[lld_agent_node] LLD/DFD ready for '{module}'")
 
     return {"lld_design": lld_design}

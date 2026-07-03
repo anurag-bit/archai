@@ -3,6 +3,10 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from services.design.helpers import get_chat_model, invoke_with_retry_and_validation
 from services.design.validators import validate_frontend_design
 from services.design.state import GraphState
+import logging
+logger = logging.getLogger(__name__)
+
+
 
 _FRONTEND_SYSTEM = (
     "You are a Frontend Architect Agent (The UI/UX Dev). "
@@ -62,20 +66,15 @@ async def frontend_agent_node(state: GraphState) -> dict:
     Returns only the keys it modifies.
     """
     module = state["current_module"]
-    print(f"[frontend_agent_node] Designing frontend architecture for '{module}'")
+    logger.info(f"[frontend_agent_node] Designing frontend architecture for '{module}'")
 
-    # Build constraint block from user-supplied architecture constraints
-    constraints_block = "### STRICT ARCHITECTURAL CONSTRAINTS\n"
-    if state.get("tech_stack"):
-        constraints_block += f"- TECH STACK: All components and routing MUST align with {state['tech_stack']}.\n"
-    if state.get("design_principles"):
-        constraints_block += f"- DESIGN PATTERNS: UI design MUST follow {state['design_principles']}.\n"
-    if state.get("security_protocols"):
-        constraints_block += f"- SECURITY: The client-side application MUST enforce {state['security_protocols']} (e.g., token-based auth, route guards, XSS protection).\n"
-    if state.get("open_questions_answers"):
-        constraints_block += f"- USER CLARIFICATIONS (ANSWERS TO OPEN QUESTIONS):\n{state['open_questions_answers']}\n"
-    if constraints_block == "### STRICT ARCHITECTURAL CONSTRAINTS\n":
-        constraints_block = ""
+    from services.design.helpers import build_constraints_block
+    constraints_block = build_constraints_block(
+        state,
+        tech_stack_template="- TECH STACK: All components and routing MUST align with {tech_stack}.\n",
+        design_template="- DESIGN PATTERNS: UI design MUST follow {design_principles}.\n",
+        security_template="- SECURITY: The client-side application MUST enforce {security_protocols} (e.g., token-based auth, route guards, XSS protection).\n"
+    )
 
     prompt = _FRONTEND_PROMPT.format(
         MODULE_NAME = module,
@@ -94,6 +93,6 @@ async def frontend_agent_node(state: GraphState) -> dict:
         ],
         validator=validate_frontend_design
     )
-    print(f"[frontend_agent_node] Frontend architecture ready for '{module}'")
+    logger.info(f"[frontend_agent_node] Frontend architecture ready for '{module}'")
 
     return {"frontend_design": frontend_design}

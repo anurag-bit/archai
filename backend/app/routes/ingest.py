@@ -6,6 +6,10 @@ from fastapi import APIRouter, HTTPException
 from schemas.ingest import IngestRequest, DocumentInput
 from services.vector_store import add_documents
 from langchain_core.documents import Document
+import logging
+logger = logging.getLogger(__name__)
+
+
 
 router = APIRouter()
 
@@ -47,11 +51,13 @@ async def ingest_endpoint(req: IngestRequest):
             meta["source"] = meta.get("source", "api")
             docs.append(Document(page_content=content, metadata=meta))
 
-        # Generate deterministic doc IDs from content
+        # Generate deterministic doc IDs from content + source
         ids = []
-        for idx, doc in enumerate(docs):
-            content_hash = hashlib.sha256(doc.page_content.encode("utf-8")).hexdigest()[:12]
-            ids.append(f"doc_{content_hash}_{idx}")
+        for doc in docs:
+            source = doc.metadata.get("source", "api")
+            hash_input = f"{doc.page_content}|{source}"
+            content_hash = hashlib.sha256(hash_input.encode("utf-8")).hexdigest()[:12]
+            ids.append(f"doc_{content_hash}")
 
         add_documents(docs, ids=ids)
 
@@ -64,7 +70,7 @@ async def ingest_endpoint(req: IngestRequest):
         raise
     except Exception as e:
         request_id = str(uuid.uuid4())
-        print(f"[Request {request_id}] Ingest error: {traceback.format_exc()}")
+        logger.error(f"[Request {request_id}] Ingest error: {traceback.format_exc()}")
         raise HTTPException(
             status_code=500,
             detail={"error": "An internal error occurred", "requestId": request_id}

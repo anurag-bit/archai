@@ -5,6 +5,10 @@ from services.design.helpers import get_chat_model, parse_llm_json, invoke_with_
 from services.design.validators import validate_dba_draft
 from services.design.state import GraphState
 from services.design.nodes.save_module_design import compute_schema_diff
+import logging
+logger = logging.getLogger(__name__)
+
+
 
 _DBA_SYSTEM = (
     "You are a Principal Database Architect (Schema Architect Agent). "
@@ -98,21 +102,15 @@ async def dba_agent_node(state: GraphState) -> dict:
     if feedback and feedback != "PASS":
         retries += 1
 
-    # Build constraint block from user-supplied architecture constraints
-    constraints_block = "### STRICT ARCHITECTURAL CONSTRAINTS\n"
-    if state.get("tech_stack"):
-        ts = state['tech_stack']
-        constraints_block += f"- TECH STACK: You MUST use {ts} (However, you may override the database engine and choose MongoDB or Neo4j if specified in the Database Selection Guide for this module's specific needs).\n"
-    if state.get("design_principles"):
-        constraints_block += f"- DESIGN PATTERNS: You MUST implement {state['design_principles']}.\n"
-    if state.get("security_protocols"):
-        constraints_block += f"- SECURITY: You MUST enforce {state['security_protocols']}.\n"
-    if state.get("open_questions_answers"):
-        constraints_block += f"- USER CLARIFICATIONS (ANSWERS TO OPEN QUESTIONS):\n{state['open_questions_answers']}\n"
-    if constraints_block == "### STRICT ARCHITECTURAL CONSTRAINTS\n":
-        constraints_block = ""  # nothing supplied — omit the section entirely
+    from services.design.helpers import build_constraints_block
+    constraints_block = build_constraints_block(
+        state,
+        tech_stack_template="- TECH STACK: You MUST use {tech_stack} (However, you may override the database engine and choose MongoDB or Neo4j if specified in the Database Selection Guide for this module's specific needs).\n",
+        design_template="- DESIGN PATTERNS: You MUST implement {design_principles}.\n",
+        security_template="- SECURITY: You MUST enforce {security_protocols}.\n"
+    )
 
-    print(f"[dba_agent_node] Designing schema for '{module}' (attempt {retries + 1})")
+    logger.info(f"[dba_agent_node] Designing schema for '{module}' (attempt {retries + 1})")
 
     # ── DYNAMIC PROMPT: targeted patch on retries, full prompt on first attempt ──
     if (retries > 0 or "HUMAN INSTRUCTION" in feedback) and feedback:
@@ -162,7 +160,8 @@ async def dba_agent_node(state: GraphState) -> dict:
     # ── PROGRAMMATIC MERGE — prevents whack-a-mole regressions ───────────────
     # If this is a retry, merge the patched tables into the old complete draft
     # instead of replacing the whole thing (which causes regressions).
-    if (retries > 0 or (feedback and "HUMAN INSTRUCTION" in feedback)) and state.get("dba_draft") and "data_model" in new_draft:
+    is_patch = retries > 0 and bool(state.get("dba_draft"))
+    if is_patch and "data_model" in new_draft:
         old_draft  = state["dba_draft"]
         old_tables = old_draft.get("data_model", {}).get("tables", [])
         new_tables = new_draft.get("data_model", {}).get("tables", [])
@@ -173,13 +172,25 @@ async def dba_agent_node(state: GraphState) -> dict:
 
             # Overwrite old tables with fixed ones, or add brand-new ones
             for new_t in new_tables:
-                if isinstance(new_t, dict) and new_t.get("table_name"):
-                    tables_dict[new_t["table_name"]] = new_t
+                if not isinstance(new_t, dict) or not new_t.get("table_name"):
+                    continue
+                t_name = new_t["table_name"]
+                if t_name not in tables_dict:
+                    tables_dict[t_name] = new_t
+                else:
+                    # Column-level merge to preserve old columns if LLM emitted a partial table
+                    old_t = tables_dict[t_name]
+                    merged_t = {**old_t, **{k: v for k, v in new_t.items() if k != "columns"}}
+                    
+                    old_cols = {c.get("name"): c for c in old_t.get("columns", []) if isinstance(c, dict)}
+                    for new_c in new_t.get("columns", []):
+                        if isinstance(new_c, dict) and new_c.get("name"):
+                            old_cols[new_c["name"]] = new_c
+                    merged_t["columns"] = list(old_cols.values())
+                    tables_dict[t_name] = merged_t
 
-            # Reconstruct the complete, merged draft
-            merged_draft = {**old_draft}
-            if "compliance_check" in new_draft:
-                merged_draft["compliance_check"] = new_draft["compliance_check"]
+            # Reconstruct the complete, merged draft (preserving new top-level keys like module_name if changed)
+            merged_draft = {**old_draft, **{k: v for k, v in new_draft.items() if k not in ["data_model", "business_rules"]}}
             merged_draft["data_model"] = {**old_draft.get("data_model", {})}
             merged_draft["data_model"]["tables"] = list(tables_dict.values())
 
@@ -199,11 +210,11 @@ async def dba_agent_node(state: GraphState) -> dict:
 
             # Debug: show merged table names for visibility
             merged_table_names = [t.get("table_name") for t in merged_draft.get("data_model", {}).get("tables", [])]
-            print(f"[dba_agent_node] 🔍 Merged table names: {merged_table_names}")
+            logger.info(f"[dba_agent_node] 🔍 Merged table names: {merged_table_names}")
 
-            print(f"[dba_agent_node] ✅ Merged {len(new_tables)} patched table(s) into existing {len(old_tables)}-table draft")
+            logger.info(f"[dba_agent_node] ✅ Merged {len(new_tables)} patched table(s) into existing {len(old_tables)}-table draft")
             return {"dba_draft": merged_draft, "qa_retries": retries}
 
     # First attempt or merge not applicable — return the full new draft
-    print(f"[dba_agent_node] Schema draft ready for '{module}'")
+    logger.info(f"[dba_agent_node] Schema draft ready for '{module}'")
     return {"dba_draft": new_draft, "qa_retries": retries}

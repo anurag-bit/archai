@@ -4,6 +4,10 @@ from typing import List, Dict, Any, Optional
 from langchain_core.messages import HumanMessage
 from core.config import MAX_CHUNK_SIZE, CHUNK_OVERLAP
 from services.design.helpers import get_chat_model
+import logging
+logger = logging.getLogger(__name__)
+
+
 
 def extract_document_outline(text: str) -> str:
     lines = text.split("\n")
@@ -105,7 +109,7 @@ async def extract_modules(normalized_text: str, constraints: str = "") -> List[s
     """
     Ask the LLM to list all distinct modules in the SRS.
     """
-    print("[extractor] Extracting modules from document outline...")
+    logger.info("[extractor] Extracting modules from document outline...")
     outline = extract_document_outline(normalized_text)
     if not outline.strip():
         outline = normalized_text[:12000]
@@ -146,7 +150,15 @@ async def extract_modules(normalized_text: str, constraints: str = "") -> List[s
         if isinstance(parsed, list) and parsed:
             modules = parsed
     except json.JSONDecodeError:
-        pass
+        import json_repair
+        try:
+            match = re.search(r'\[.*\]', content.strip(), re.DOTALL)
+            repair_target = match.group(0) if match else content.strip()
+            parsed = json_repair.loads(repair_target)
+            if isinstance(parsed, list) and parsed:
+                modules = parsed
+        except Exception:
+            pass
 
     if not modules:
         # Regex fallback
@@ -156,5 +168,5 @@ async def extract_modules(normalized_text: str, constraints: str = "") -> List[s
     if not modules:
         modules = ["Core System"]
 
-    print(f"[extractor] Found {len(modules)} modules: {modules}")
+    logger.info(f"[extractor] Found {len(modules)} modules: {modules}")
     return modules

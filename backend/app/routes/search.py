@@ -2,6 +2,10 @@ import uuid
 import traceback
 from fastapi import APIRouter, HTTPException, Query
 from services.vector_store import similarity_search_with_score
+import logging
+logger = logging.getLogger(__name__)
+
+
 
 router = APIRouter()
 
@@ -30,7 +34,7 @@ async def search_endpoint(
         }
     except Exception as e:
         request_id = str(uuid.uuid4())
-        print(f"[Request {request_id}] Search error: {traceback.format_exc()}")
+        logger.error(f"[Request {request_id}] Search error: {traceback.format_exc()}")
         raise HTTPException(
             status_code=500,
             detail={"error": "An internal error occurred", "requestId": request_id}
